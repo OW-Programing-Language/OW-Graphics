@@ -1,0 +1,31 @@
+# This integration test needs the OW Graphics Java native provider, but no window.
+# Launch from the repository root, not its parent workspace.
+import "@flow/src/App.ow"
+import "../src/graphics/model/api/ModelApi.ow"
+import "../src/graphics/model/infra/ObjModel.ow"
+import "../src/graphics/mesh/api/MeshApi.ow"
+import "../src/graphics/mesh/headless/HeadlessMesh.ow"
+
+main:
+  set app: new App()
+  call: app.use_native_as(Graphics.ObjModel, "GRAPHICS_MODEL")
+  call: app.use_native_as(Graphics.HeadlessMesh, "GRAPHICS_MESH")
+  call: assert(app.boot() == 1)
+  set importer GRAPHICS_MODEL: app.service("model")
+  set mesh GRAPHICS_MESH: app.service("mesh")
+  set tiny: "v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3"
+  set parsed: importer.parse_obj(tiny)
+  call: assert(len(parsed) == 4, "OBJ returns four arrays")
+  call: assert(len(parsed[0]) == 9, "three vertices")
+  call: assert(len(parsed[1]) == 6, "UV fallback")
+  call: assert(len(parsed[2]) == 9, "generated normals")
+  call: assert(len(parsed[3]) == 3, "triangle")
+  set loaded: importer.load_obj("examples/model_viewer/assets/pyramid.obj")
+  call: assert(len(loaded[0]) == 54, "pyramid has six triangles, 18 vertices")
+  call: assert(len(loaded[2]) == 54, "pyramid flat normals")
+  call: assert(len(loaded[3]) == 18, "pyramid indexed triangle count")
+  set id int: mesh.create_lit_indexed(loaded[0], loaded[1], loaded[2], loaded[3])
+  call: assert(id > 0, "OBJ feeds typed mesh module")
+  call: assert(mesh.destroy(id) == 1)
+  call: assert(app.stop() == 1)
+  print: "PASS: OW/flOW OBJ local loading, triangulation and geometry arrays"
