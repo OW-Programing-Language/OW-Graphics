@@ -43,7 +43,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
                  "graphics.shader.uniform_int", "graphics.shader.destroy",
                  "graphics.mesh.create", "graphics.mesh.create_indexed", "graphics.mesh.create_lit_indexed",
                  "graphics.mesh.draw", "graphics.mesh.destroy",
-                 "graphics.texture.create_rgba8", "graphics.texture.bind",
+                 "graphics.texture.create_rgba8", "graphics.texture.load_image", "graphics.texture.bind",
                  "graphics.texture.destroy", "graphics.input.key_down",
                  "graphics.input.cursor_delta", "graphics.input.scroll_delta",
                  "graphics.input.mouse_button_down",
@@ -85,6 +85,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.mesh.draw" -> drawMesh(args);
             case "graphics.mesh.destroy" -> destroyMesh(args);
             case "graphics.texture.create_rgba8" -> createTexture(args);
+            case "graphics.texture.load_image" -> loadImage(args);
             case "graphics.texture.bind" -> bindTexture(args);
             case "graphics.texture.destroy" -> destroyTexture(args);
             default -> throw new AssertionError("Unreachable graphics operation");
@@ -469,6 +470,16 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
     private int createTexture(List<Object> args) {
         count(args, 3);
         var image = GraphicsArguments.rgba8(args.get(0), args.get(1), args.get(2));
+        ensureOwner();
+        return resources.createTexture(image);
+    }
+
+    private int loadImage(List<Object> args) {
+        count(args, 1);
+        String filename = GraphicsArguments.string(args.get(0), "image path");
+        // Validate and decode on CPU before accessing GL, preventing GPU
+        // resource allocation on invalid or oversized files.
+        var image = ImageAssetLoader.loadRelative(filename, Path.of("").toAbsolutePath());
         ensureOwner();
         return resources.createTexture(image);
     }

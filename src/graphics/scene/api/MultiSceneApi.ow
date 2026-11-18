@@ -1,0 +1,6 @@
+# A scene with any number of draws; clear the frame only once per frame.
+# The application binds shader, material, texture and model matrix per object.
+module_type GRAPHICS_MULTI_SCENE:
+  include NATIVE_LIFECYCLE
+  fn begin_frame(red int, green int, blue int) -> int
+  fn draw_object(mesh int) -> int

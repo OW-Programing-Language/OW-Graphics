@@ -1,0 +1,35 @@
+# Only the typed GRAPHICS_TRANSFORM module is required.
+# Graph math stays in native OW; no GPU handles or material decisions here.
+functor MakeSceneGraph(T: GRAPHICS_TRANSFORM) -> GRAPHICS_SCENE_GRAPH:
+  fn name() -> string:
+    return: "scene_graph"
+  fn requires() -> array:
+    return: ["transforms"]
+  fn register() -> int:
+    return: 0
+  fn start() -> int:
+    return: 0
+  fn stop() -> int:
+    return: 0
+  fn reload() -> int:
+    return: 0
+  fn on_event(type string, payload int) -> int:
+    return: 0
+  fn resolve(parents array, localMatrices array) -> array:
+    call: assert(len(parents) == len(localMatrices), "parents and transforms length mismatch")
+    call: assert(len(parents) <= 1024, "scene graph maximum is 1024 nodes")
+    set worlds: array(len(parents), [])
+    set i int: 0
+    while: i < len(parents)
+      set parent int: parents[i]
+      set local: localMatrices[i]
+      call: assert(len(local) == 16, "local transform needs 16 values")
+      set world: local
+      if: parent < 0
+        call: assert(parent == 0 - 1, "root parent must be -1")
+      else:
+        call: assert(parent < i, "parents must precede children, no cycles")
+        set world: T.compose(worlds[parent], local)
+      set worlds[i]: world
+      set i: i + 1
+    return: worlds

@@ -1,0 +1,5 @@
+# Declarative tree of 3D transforms. Parents must appear before children.
+# The result is an array of column-major model matrices, one per node.
+module_type GRAPHICS_SCENE_GRAPH:
+  include NATIVE_LIFECYCLE
+  fn resolve(parents array, localMatrices array) -> array
