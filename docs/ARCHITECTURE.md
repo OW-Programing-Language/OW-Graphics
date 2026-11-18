@@ -6,7 +6,7 @@ The project is a **modular monorepo**, not a set of copy-pasted framework files.
 
 - `dependencies.yml` pins **one external OW source library**: flOW v2. `ow deps install` resolves it to `.ow/deps/flow`; `@flow/src/App.ow` is a real OW dependency import.
 - `src/graphics/*/api` contains public module signatures extending flOW's `NATIVE_LIFECYCLE`.
-- `src/graphics/*/infra` contains implementations, not imported by consumer code. The composition root chooses implementations.
+- Each domain's `api/` defines its public contract. Implementation folders (`infra/`, `opengl/`, `headless/`) are selected only by the composition root; scenes import public renderer contracts instead of native code.
 - `scene/infra/MakeTriangleScene.ow` and `MakeMeshScene.ow` are **native OW functors**, parameterized by the public renderer contract. OpenGL can be swapped out without changing the scene.
 - `native-bridge/` is a separate JVM adapter implementing OW's `RuntimeExtension` SPI, using LWJGL to call **real GLFW/OpenGL native libraries**. OW code never manipulates native pointers.
 - `tests/headless_flow.ow` uses an actual headless renderer module. It boots with flOW, including dependency ordering and typed service retrieval, without GLFW or a GPU.
@@ -14,16 +14,13 @@ The project is a **modular monorepo**, not a set of copy-pasted framework files.
 ## Dependency graph
 
 ```text
-          [Window: GLFW] <-- [Input: GLFW]
-                 ^
-                 |
-          [Renderer: OpenGL] <-- [Scene: functor(Renderer)]
-                 ^
-                 | 
-          [Mesh] [Shader]
-            \     /
-              Window
+Scene (MakeMeshScene functor) --> Renderer --> Window (GLFW)
+Shader -------------------------------^
+Mesh ---------------------------------^
+Input --------------------------------^
 ```
+
+Arrows mean "depends on". The window must be registered as a provider before dependent modules can start; flOW computes that order even when modules are registered in reverse.
 
 Shader and Mesh modules each require the Window service; all GPU handles are opaque and validated within the runtime adapter. The headless counterparts have no window dependency. Only one renderer with service name `renderer` should be registered per application. flOW blocks stopping a provider while dependents are active.
 
@@ -35,15 +32,15 @@ The extension holds a scoped resource registry per interpreter and context. Dest
 
 ## Roadmap
 
-1. [x] External flOW dependency pinned to a commit
-2. [x] Typed window / renderer / input / scene interfaces and functor
-3. [x] GPU-free headless contract + lifecycle smoke test
-4. [x] JVM native extension with GLFW and OpenGL 3.3 triangle
-5. [ ] Vulkan backend (separate adapter, surface/swapchain, synchronization)
-6. [x] Phase 1: OW-provided GLSL shaders, uniform vec4 and non-indexed vertex meshes
-10. [ ] Textures, indexed meshes, camera / matrices, scene graph, batch drawing
-7. [ ] Native C ABI / compiler-level FFI when ow-lang supports a stable general-purpose FFI
-8. [x] Dependency lockfile pinned to the resolved flOW Git commit
-9. [ ] Linux/Windows/macOS GPU smoke tests (CI remains headless)
+1. [x] Pin flOW and its lockfile to an immutable commit
+2. [x] Typed window / renderer / input / scene interfaces and native OW functors
+3. [x] GPU-free flOW lifecycle, contract and resource smoke tests
+4. [x] JVM native extension with GLFW and an OpenGL 3.3 triangle
+5. [x] Custom OW GLSL shaders, vec4 uniforms and non-indexed triangle meshes
+6. [x] Mesa/Xvfb software OpenGL framebuffer and end-to-end OW integration tests
+7. [ ] Vulkan backend (surface, swapchain, synchronization)
+8. [ ] Textures, indexed meshes, camera / matrices, scene graph, batch drawing
+9. [ ] Native C ABI / compiler-level FFI after ow-lang supports a stable general-purpose interface
+10. [ ] Windows/macOS physical GPU smoke tests and broader graphics-driver compatibility
 
 `ow build` is **not** a supported way to compile the full demo to a stand-alone native executable yet: OW's LLVM backend supports only a limited static module subset and does not lower the SPI/plugin calls. Use `ow run` with the extension JAR on the JVM classpath.
