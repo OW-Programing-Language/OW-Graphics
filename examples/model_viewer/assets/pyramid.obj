@@ -1,0 +1,18 @@
+# Original OW Graphics test model. Triangles have generated flat normals.
+# Origin at (0,0,0); tip on +Y, base on y=-0.6.
+o OWPyramid
+v -0.7 -0.6 0.7
+v 0.7 -0.6 0.7
+v 0.7 -0.6 -0.7
+v -0.7 -0.6 -0.7
+v 0.0 0.8 0.0
+vt 0.0 0.0
+vt 1.0 0.0
+vt 0.5 1.0
+vt 1.0 1.0
+f 1/1 2/2 5/3
+f 2/1 3/2 5/3
+f 3/1 4/2 5/3
+f 4/1 1/2 5/3
+# Fan-triangulated base: no material library required.
+f 4/1 3/2 2/4 1/3

@@ -1,0 +1,6 @@
+# Decode Wavefront OBJ geometry into [positions,uvs,normals,indices].
+# Arrays feed directly into GRAPHICS_MESH.create_lit_indexed.
+module_type GRAPHICS_MODEL:
+  include NATIVE_LIFECYCLE
+  fn parse_obj(contents string) -> array
+  fn load_obj(relativePath string) -> array

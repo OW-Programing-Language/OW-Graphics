@@ -47,6 +47,11 @@ jobs:
           java -jar ../ow-lang/target/OwIDE.jar run tests/headless_3d.ow
           java -jar ../ow-lang/target/OwIDE.jar check examples/rotating_cube/main.ow
           java -jar ../ow-lang/target/OwIDE.jar check examples/rotating_cube/smoke.ow
+          java -jar ../ow-lang/target/OwIDE.jar check tests/headless_orbit.ow
+          java -jar ../ow-lang/target/OwIDE.jar run tests/headless_orbit.ow
+          java -jar ../ow-lang/target/OwIDE.jar check tests/obj_loader.ow
+          java -jar ../ow-lang/target/OwIDE.jar check examples/model_viewer/main.ow
+          java -jar ../ow-lang/target/OwIDE.jar check examples/model_viewer/smoke.ow
       - name: Compile and test native SPI bridge (no GPU)
         run: mvn -B -q -f ow-graphics/native-bridge/pom.xml test
       - name: Install Mesa software OpenGL for framebuffer integration smoke test
@@ -74,3 +79,17 @@ jobs:
           xvfb-run -a -s "-screen 0 800x600x24" env LIBGL_ALWAYS_SOFTWARE=1 \
             java -cp "ow-lang/target/OwIDE.jar:ow-graphics/native-bridge/target/test-classes:ow-graphics/native-bridge/target/classes:ow-graphics/native-bridge/target/lib/*" \
             org.owgraphics.runtime.DepthLightingGpuSmoke
+          xvfb-run -a -s "-screen 0 800x600x24" env LIBGL_ALWAYS_SOFTWARE=1 \
+            java -cp "ow-lang/target/OwIDE.jar:ow-graphics/native-bridge/target/test-classes:ow-graphics/native-bridge/target/classes:ow-graphics/native-bridge/target/lib/*" \
+            org.owgraphics.runtime.NativeInputGpuSmoke
+          xvfb-run -a -s "-screen 0 800x600x24" env LIBGL_ALWAYS_SOFTWARE=1 \
+            java -cp "ow-lang/target/OwIDE.jar:ow-graphics/native-bridge/target/test-classes:ow-graphics/native-bridge/target/classes:ow-graphics/native-bridge/target/lib/*" \
+            org.owgraphics.runtime.MultiLightGpuSmoke
+      - name: Load OBJ model through actual OW runtime + flOW provider
+        working-directory: ow-graphics
+        run: |
+          java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/test-classes:native-bridge/target/classes:native-bridge/target/lib/*" \
+            dev.oreo.Main run tests/obj_loader.ow
+          xvfb-run -a -s "-screen 0 800x600x24" env LIBGL_ALWAYS_SOFTWARE=1 \
+            java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/test-classes:native-bridge/target/classes:native-bridge/target/lib/*" \
+            dev.oreo.Main run examples/model_viewer/smoke.ow

@@ -1,0 +1,21 @@
+# Importer is CPU-only, so this flOW module has no GPU or window dependency.
+# Java bridge handles the OBJ tokenizer and bounded local file access.
+module Graphics.ObjModel: GRAPHICS_MODEL
+  fn name() -> string:
+    return: "model"
+  fn requires() -> array:
+    return: []
+  fn register() -> int:
+    return: 0
+  fn start() -> int:
+    return: 0
+  fn stop() -> int:
+    return: 0
+  fn reload() -> int:
+    return: 0
+  fn on_event(type string, payload int) -> int:
+    return: 0
+  fn parse_obj(contents string) -> array:
+    return: extension("graphics.model.parse_obj", contents)
+  fn load_obj(relativePath string) -> array:
+    return: extension("graphics.model.load_obj", relativePath)

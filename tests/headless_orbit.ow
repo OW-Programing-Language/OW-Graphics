@@ -1,0 +1,45 @@
+# All camera movement and light presets are pure OW; no desktop required.
+import "@flow/src/App.ow"
+import "../src/graphics/camera/api/CameraApi.ow"
+import "../src/graphics/camera/infra/Camera.ow"
+import "../src/graphics/camera/api/OrbitApi.ow"
+import "../src/graphics/camera/infra/MakeOrbitController.ow"
+import "../src/graphics/lighting/api/LightRigApi.ow"
+import "../src/graphics/lighting/infra/StudioLights.ow"
+
+main:
+  set orbit GRAPHICS_ORBIT_CONTROLLER: MakeOrbitController(Graphics.Camera)
+  set app: new App()
+  call: app.use_native_as(orbit, "GRAPHICS_ORBIT_CONTROLLER")
+  call: app.use_native_as(Graphics.StudioLights, "GRAPHICS_LIGHT_RIG")
+  call: app.use_native_as(Graphics.Camera, "GRAPHICS_CAMERA")
+  call: assert(app.boot() == 1)
+  set controls GRAPHICS_ORBIT_CONTROLLER: app.service("orbit")
+  set lights GRAPHICS_LIGHT_RIG: app.service("light_rig")
+  set initial: controls.view(0.0, 0.0, 3.0)
+  call: assert(initial[14] < 0.0 - 2.999, "orbit from z+")
+  set moved: controls.advance(0.0, 0.0, 4.0, 100.0, 0.0 - 50.0, 2.0)
+  call: assert(moved[0] > 0.699, "mouse updates yaw")
+  call: assert(moved[1] < 0.0, "mouse updates pitch")
+  call: assert(moved[2] < 4.0, "scroll zooms in")
+  set wrapped: controls.advance(3.0, 0.0, 4.0, 100.0, 0.0, 0.0)
+  call: assert(wrapped[0] < 0.0, "yaw wraps into supported interval")
+  set zoomOut: controls.advance(0.0, 0.0, 4.0, 0.0, 0.0, 0.0 - 1000.0)
+  call: assert(zoomOut[2] == 30.0, "max zoom clamp")
+  set nextView: controls.view(moved[0], moved[1], moved[2])
+  call: assert(len(nextView) == 16)
+  set clamped: controls.advance(0.0, 0.0, 4.0, 0.0, 10000.0, 10000.0)
+  call: assert(clamped[1] == 1.3, "pitch clamp")
+  call: assert(clamped[2] == 1.5, "zoom clamp")
+  set key: lights.key_direction()
+  set fill: lights.fill_direction()
+  set point: lights.point_position()
+  set levels: lights.intensities()
+  call: assert(len(key) == 3)
+  call: assert(len(fill) == 3)
+  call: assert(len(point) == 3)
+  call: assert(len(levels) == 3)
+  call: assert(levels[0] > levels[1], "key brighter than fill")
+  call: assert(app.disable("camera") == 0, "orbit needs camera")
+  call: assert(app.stop() == 1)
+  print: "PASS: typed flOW orbit camera and multi-light rig"

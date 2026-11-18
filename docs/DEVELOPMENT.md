@@ -118,3 +118,41 @@ java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/ow-graphics-native-0.
 A system with compatible OpenGL 3.3 drivers is still needed to validate actual interactive rendering and performance on Windows/macOS/physical GPU hardware.
 
 **Not implemented:** mouse-orbit controller, point lights, materials/PBR, shadow mapping, scene graph/occlusion culling, skeletal animation, or Vulkan.
+
+## 6. Phase 5 — orbit camera, multiple lights and Wavefront OBJ
+
+The example [model_viewer/main.ow](../examples/model_viewer/main.ow) loads [an original small OBJ pyramid](../examples/model_viewer/assets/pyramid.obj), generates normals when they are absent, uploads indexed geometry and renders three additive Lambert sources: two directional lights and a distance-attenuated point light. The world stays right-handed, +Y up.
+
+```bash
+ow check examples/model_viewer/main.ow
+ow run tests/headless_orbit.ow
+mvn -f native-bridge/pom.xml test
+
+# From the OW-Graphics repository root, after building the bridge:
+java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/ow-graphics-native-0.1.0-SNAPSHOT.jar:native-bridge/target/lib/*" dev.oreo.Main run examples/model_viewer/main.ow
+```
+
+Controls: **hold left mouse and drag** to orbit, **scroll** to zoom, **arrow keys** to orbit, **Escape** to close. Cursor deltas initialize to zero on first sample and reset when the window reopens. All GLFW input calls run on the owning window thread. The orbit controller is a one-parameter native OW functor `MakeOrbitController(Camera)`; yaw/pitch/distance belong to the application rather than global state. Pitch and zoom are clamped.
+
+### OBJ import, formats and safety
+
+The `GRAPHICS_MODEL` module exposes two methods:
+
+```ow
+set importer GRAPHICS_MODEL: app.service("model")
+set geometry: importer.load_obj("examples/model_viewer/assets/pyramid.obj")
+# Or: importer.parse_obj("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3")
+set meshId int: meshes.create_lit_indexed(geometry[0], geometry[1], geometry[2], geometry[3])
+```
+
+`parse_obj` returns four OW arrays: `[xyz, uv, normals, triangleIndices]`. The first importer supports `v`, `vt`, `vn`, `f`, positive and negative indices, missing UV/normal fallbacks and **fan triangulation for convex polygons**. Face corners are expanded into vertices so UV seams and flat normals are retained without accidentally welding incompatible corners.
+
+`load_obj` reads only a `*.obj` **relative to the current working directory**, rejecting parent traversal, absolute paths and symlinks escaping the project. The parser caps source input at 1 MiB and the output at 100,000 rendered vertices. No external HTTP requests, executable asset features, or arbitrary native pointers. Concave n-gons, MTL materials, smoothing groups, PNG/JPEG texture loading and skeletal animation are **not** yet supported.
+
+### Lighting model and tests
+
+`GRAPHICS_LIGHT_RIG` supplies independent key/fill directions, point position, intensities and ambient RGB; `Graphics.StudioLights` is the example preset. The shader uses normal-based diffuse terms, separate warm/cool tones and `1/(1+0.12*d²)` point attenuation. Light parameters are shader uniforms owned by the OW application, not hard-coded Java shader logic.
+
+CI checks `tests/headless_orbit.ow`, CPU-only OBJ validation (including path sandboxing), native GLFW input polling, a multi-light framebuffer test, actual `tests/obj_loader.ow`, and a one-frame `examples/model_viewer/smoke.ow` under Mesa/Xvfb.
+
+**Limitations:** basic fixed camera/orbit controls, no gamepad input, no mouse capture/fps controller, no variable-rate key controls, no OBJ material library/texture file loading, no native OW AOT or Vulkan backend.
