@@ -1,0 +1,56 @@
+# Fully programmable OpenGL 3.3 example; build the Java SPI native provider first.
+# Use escaped newlines in OW string literals; GLSL requires #version on line 1.
+import "@flow/src/App.ow"
+import "../../src/graphics/window/api/WindowApi.ow"
+import "../../src/graphics/window/infra/GlfwWindow.ow"
+import "../../src/graphics/input/api/InputApi.ow"
+import "../../src/graphics/input/infra/GlfwInput.ow"
+import "../../src/graphics/renderer/api/RendererApi.ow"
+import "../../src/graphics/renderer/opengl/OpenGLRenderer.ow"
+import "../../src/graphics/shader/api/ShaderApi.ow"
+import "../../src/graphics/shader/opengl/OpenGLShader.ow"
+import "../../src/graphics/mesh/api/MeshApi.ow"
+import "../../src/graphics/mesh/opengl/OpenGLMesh.ow"
+import "../../src/graphics/scene/api/MeshSceneApi.ow"
+import "../../src/graphics/scene/infra/MakeMeshScene.ow"
+
+main:
+  set scene GRAPHICS_MESH_SCENE: MakeMeshScene(Graphics.OpenGLRenderer)
+  set app: new App()
+  call: app.use_native_as(scene, "GRAPHICS_MESH_SCENE")
+  call: app.use_native_as(Graphics.OpenGLShader, "GRAPHICS_SHADER")
+  call: app.use_native_as(Graphics.OpenGLMesh, "GRAPHICS_MESH")
+  call: app.use_native_as(Graphics.GlfwInput, "GRAPHICS_INPUT")
+  call: app.use_native_as(Graphics.OpenGLRenderer, "GRAPHICS_RENDERER")
+  call: app.use_native_as(Graphics.GlfwWindow, "GRAPHICS_WINDOW")
+  call: assert(app.boot() == 1, "boot with topological service ordering")
+
+  set window GRAPHICS_WINDOW: app.service("window")
+  set input GRAPHICS_INPUT: app.service("input")
+  set shaders GRAPHICS_SHADER: app.service("shader")
+  set meshes GRAPHICS_MESH: app.service("mesh")
+  set liveScene GRAPHICS_MESH_SCENE: app.service("scene")
+  call: assert(window.open(960, 540, "OW Graphics / Programmable") == 1)
+
+  set vertexSource: "#version 330 core\nlayout (location = 0) in vec3 aPosition;\nvoid main() { gl_Position = vec4(aPosition, 1.0); }"
+  set fragmentSource: "#version 330 core\nuniform vec4 uTint;\nout vec4 pixel;\nvoid main() { pixel = uTint; }"
+  set shaderId int: shaders.create(vertexSource, fragmentSource)
+  set meshId int: meshes.create([0.0 - 0.65, 0.0 - 0.55, 0.0, 0.65, 0.0 - 0.55, 0.0, 0.0, 0.68, 0.0])
+  call: assert(shaderId > 0, "GLSL compilation and linking")
+  call: assert(meshId > 0, "upload vertex positions")
+  call: assert(shaders.bind(shaderId) == 1)
+  call: assert(shaders.set_vec4(shaderId, "uTint", 0.20, 0.74, 0.86, 1.0) == 1, "upload color uniform")
+
+  while: window.should_close() == 0
+    call: window.poll()
+    if: input.escape_pressed() == 1
+      call: window.request_close()
+    else:
+      call: shaders.bind(shaderId)
+      call: liveScene.render_frame(meshId)
+      call: window.present()
+
+  # Explicit disposal before GL context shutdown; window close is a final fallback.
+  call: meshes.destroy(meshId)
+  call: shaders.destroy(shaderId)
+  call: app.stop()

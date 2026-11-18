@@ -1,0 +1,8 @@
+# OpenGL shader programs are opaque int handles owned by the current window.
+# No raw native pointer or OpenGL object name crosses the OW boundary.
+module_type GRAPHICS_SHADER:
+  include NATIVE_LIFECYCLE
+  fn create(vertexSource string, fragmentSource string) -> int
+  fn bind(handle int) -> int
+  fn set_vec4(handle int, name string, r float, g float, b float, a float) -> int
+  fn destroy(handle int) -> int

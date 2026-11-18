@@ -20,17 +20,22 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
     private long window;
     private Thread owner;
     private boolean glfwInitialized;
+    private boolean contextReady;
     private int program;
     private int vertexArray;
     private int vertexBuffer;
+    private final OpenGlResources resources = new OpenGlResources();
 
     @Override
     public boolean supports(String operation) {
         return switch (operation) {
             case "graphics.window.open", "graphics.window.poll",
                  "graphics.window.present", "graphics.window.should_close",
-                 "graphics.window.close", "graphics.input.escape",
-                 "graphics.opengl.clear", "graphics.opengl.triangle" -> true;
+                 "graphics.window.close", "graphics.window.request_close",
+                 "graphics.input.escape", "graphics.opengl.clear", "graphics.opengl.triangle",
+                 "graphics.shader.create", "graphics.shader.bind",
+                 "graphics.shader.uniform4", "graphics.shader.destroy",
+                 "graphics.mesh.create", "graphics.mesh.draw", "graphics.mesh.destroy" -> true;
             default -> false;
         };
     }
@@ -45,9 +50,17 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.window.present" -> present(args);
             case "graphics.window.should_close" -> shouldClose(args);
             case "graphics.window.close" -> closeWindow(args);
+            case "graphics.window.request_close" -> requestClose(args);
             case "graphics.input.escape" -> escapePressed(args);
             case "graphics.opengl.clear" -> clearFrame(args);
             case "graphics.opengl.triangle" -> drawTriangle(args);
+            case "graphics.shader.create" -> createShader(args);
+            case "graphics.shader.bind" -> bindShader(args);
+            case "graphics.shader.uniform4" -> setShaderVec4(args);
+            case "graphics.shader.destroy" -> destroyShader(args);
+            case "graphics.mesh.create" -> createMesh(args);
+            case "graphics.mesh.draw" -> drawMesh(args);
+            case "graphics.mesh.destroy" -> destroyMesh(args);
             default -> throw new AssertionError("Unreachable graphics operation");
         };
     }
@@ -115,6 +128,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
                 throw new IllegalStateException("Unable to create a GLFW OpenGL 3.3 window");
             glfwMakeContextCurrent(window);
             GL.createCapabilities();
+            contextReady = true;
             glfwSwapInterval(1);
             glfwShowWindow(window);
             return 1;
@@ -236,6 +250,72 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
         return shader;
     }
 
+    private int requestClose(List<Object> args) {
+        count(args, 0);
+        ensureOwner();
+        glfwSetWindowShouldClose(window, true);
+        return 1;
+    }
+
+    private int createShader(List<Object> args) {
+        count(args, 2);
+        String vertexSource = GraphicsArguments.shaderSource(args.get(0), "vertexSource");
+        String fragmentSource = GraphicsArguments.shaderSource(args.get(1), "fragmentSource");
+        ensureOwner();
+        return resources.createProgram(vertexSource, fragmentSource);
+    }
+
+    private int bindShader(List<Object> args) {
+        count(args, 1);
+        int handle = GraphicsArguments.integer(args.get(0), "shader handle");
+        ensureOwner();
+        resources.bindProgram(handle);
+        return 1;
+    }
+
+    private int setShaderVec4(List<Object> args) {
+        count(args, 6);
+        int handle = GraphicsArguments.integer(args.get(0), "shader handle");
+        String name = GraphicsArguments.string(args.get(1), "uniform name");
+        float r = GraphicsArguments.finiteFloat(args.get(2), "r");
+        float g = GraphicsArguments.finiteFloat(args.get(3), "g");
+        float b = GraphicsArguments.finiteFloat(args.get(4), "b");
+        float a = GraphicsArguments.finiteFloat(args.get(5), "a");
+        ensureOwner();
+        return resources.uniform4(handle, name, r, g, b, a);
+    }
+
+    private int destroyShader(List<Object> args) {
+        count(args, 1);
+        int handle = GraphicsArguments.integer(args.get(0), "shader handle");
+        ensureOwner();
+        resources.destroyProgram(handle);
+        return 1;
+    }
+
+    private int createMesh(List<Object> args) {
+        count(args, 1);
+        float[] positions = GraphicsArguments.trianglePositions(args.get(0));
+        ensureOwner();
+        return resources.createMesh(positions);
+    }
+
+    private int drawMesh(List<Object> args) {
+        count(args, 1);
+        int handle = GraphicsArguments.integer(args.get(0), "mesh handle");
+        ensureOwner();
+        resources.drawMesh(handle);
+        return 1;
+    }
+
+    private int destroyMesh(List<Object> args) {
+        count(args, 1);
+        int handle = GraphicsArguments.integer(args.get(0), "mesh handle");
+        ensureOwner();
+        resources.destroyMesh(handle);
+        return 1;
+    }
+
     private int closeWindow(List<Object> args) {
         count(args, 0);
         if (window == 0L) {
@@ -250,13 +330,17 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
 
     private void release() {
         if (window != 0L) {
-            if (program != 0) glDeleteProgram(program);
-            if (vertexBuffer != 0) glDeleteBuffers(vertexBuffer);
-            if (vertexArray != 0) glDeleteVertexArrays(vertexArray);
+            if (contextReady) {
+                resources.releaseAll();
+                if (program != 0) glDeleteProgram(program);
+                if (vertexBuffer != 0) glDeleteBuffers(vertexBuffer);
+                if (vertexArray != 0) glDeleteVertexArrays(vertexArray);
+                GL.setCapabilities(null);
+            }
             program = vertexBuffer = vertexArray = 0;
+            contextReady = false;
             glfwDestroyWindow(window);
             window = 0L;
-            GL.setCapabilities(null);
         }
         if (glfwInitialized) {
             glfwTerminate();
