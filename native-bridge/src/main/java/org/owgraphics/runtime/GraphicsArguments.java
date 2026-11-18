@@ -127,4 +127,25 @@ final class GraphicsArguments {
         return new ImageData(width, height, data);
     }
 
+    /** Per-vertex normals are required to shade edges of an indexed cube. */
+    record LitGeometry(IndexedGeometry base, float[] normals) {}
+
+    static LitGeometry litGeometry(Object vertices, Object textureCoordinates,
+                                   Object rawNormals, Object elements) {
+        IndexedGeometry geometry = indexedGeometry(vertices, textureCoordinates, elements);
+        if (!(rawNormals instanceof List<?> values)
+                || values.size() != geometry.positions().length)
+            throw new IllegalArgumentException("normals must have three components per vertex");
+        float[] normals = new float[values.size()];
+        for (int i = 0; i < normals.length; i++)
+            normals[i] = finiteFloat(values.get(i), "normals[" + i + "]");
+        for (int i = 0; i < normals.length; i += 3) {
+            float lengthSq = normals[i] * normals[i] + normals[i + 1] * normals[i + 1]
+                    + normals[i + 2] * normals[i + 2];
+            if (!Float.isFinite(lengthSq) || lengthSq < 0.000001f)
+                throw new IllegalArgumentException("normal at vertex " + (i / 3) + " is zero-length");
+        }
+        return new LitGeometry(geometry, normals);
+    }
+
 }
