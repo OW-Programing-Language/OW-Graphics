@@ -1,0 +1,21 @@
+# Frame clearing is separated from per-object draws to prevent scene erasure.
+import "@flow/src/App.ow"
+import "../src/graphics/renderer/api/RendererApi.ow"
+import "../src/graphics/renderer/headless/HeadlessRenderer.ow"
+import "../src/graphics/scene/api/MultiSceneApi.ow"
+import "../src/graphics/scene/infra/MakeMultiScene.ow"
+
+main:
+  set scene GRAPHICS_MULTI_SCENE: MakeMultiScene(Graphics.HeadlessRenderer)
+  set app: new App()
+  call: app.use_native_as(scene, "GRAPHICS_MULTI_SCENE")
+  call: app.use_native_as(Graphics.HeadlessRenderer, "GRAPHICS_RENDERER")
+  call: assert(app.boot() == 1)
+  set drawing GRAPHICS_MULTI_SCENE: app.service("multi_scene")
+  call: assert(drawing.begin_frame(10, 20, 30) == 1)
+  call: assert(drawing.draw_object(1) == 1)
+  call: assert(drawing.draw_object(2) == 1)
+  call: assert(drawing.draw_object(0) == 0, "invalid mesh rejected")
+  call: assert(app.disable("renderer") == 0, "scene holds renderer lifecycle")
+  call: assert(app.stop() == 1)
+  print: "PASS: flOW multiscene independently draws two objects"
