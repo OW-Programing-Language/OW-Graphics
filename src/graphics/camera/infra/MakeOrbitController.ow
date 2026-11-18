@@ -16,6 +16,12 @@ functor MakeOrbitController(Cam: GRAPHICS_CAMERA) -> GRAPHICS_ORBIT_CONTROLLER:
   fn on_event(type string, payload int) -> int:
     return: 0
   fn advance(yaw float, pitch float, distance float, dx float, dy float, scroll float) -> array:
+    call: assert(yaw >= 0.0 - 3.141592653589793, "yaw below supported range")
+    call: assert(yaw <= 3.141592653589793, "yaw above supported range")
+    call: assert(pitch >= 0.0 - 1.3, "pitch below supported range")
+    call: assert(pitch <= 1.3, "pitch above supported range")
+    call: assert(distance >= 1.5, "orbit distance below supported range")
+    call: assert(distance <= 30.0, "orbit distance above supported range")
     set x float: dx
     set y float: dy
     if: x > 2000.0
