@@ -14,7 +14,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: OW-Programing-Language/ow-lang
-          ref: main
+          # Tested OW runtime; update deliberately after compatibility checks.
+          ref: e249975a4f835e7ad5378cf7f3633e059d8396b4
           path: ow-lang
       - uses: actions/setup-java@v4
         with:
