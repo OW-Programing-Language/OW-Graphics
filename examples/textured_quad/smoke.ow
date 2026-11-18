@@ -1,0 +1,71 @@
+import "@flow/src/App.ow"
+import "../../src/graphics/window/api/WindowApi.ow"
+import "../../src/graphics/window/infra/GlfwWindow.ow"
+import "../../src/graphics/input/api/InputApi.ow"
+import "../../src/graphics/input/infra/GlfwInput.ow"
+import "../../src/graphics/renderer/api/RendererApi.ow"
+import "../../src/graphics/renderer/opengl/OpenGLRenderer.ow"
+import "../../src/graphics/shader/api/ShaderApi.ow"
+import "../../src/graphics/shader/opengl/OpenGLShader.ow"
+import "../../src/graphics/mesh/api/MeshApi.ow"
+import "../../src/graphics/mesh/opengl/OpenGLMesh.ow"
+import "../../src/graphics/texture/api/TextureApi.ow"
+import "../../src/graphics/texture/opengl/OpenGLTexture.ow"
+import "../../src/graphics/math/api/TransformApi.ow"
+import "../../src/graphics/math/infra/Transforms.ow"
+import "../../src/graphics/scene/api/MeshSceneApi.ow"
+import "../../src/graphics/scene/infra/MakeMeshScene.ow"
+
+main:
+  set scene GRAPHICS_MESH_SCENE: MakeMeshScene(Graphics.OpenGLRenderer)
+  set app: new App()
+  # Register consumers before providers; flOW topologically sorts boot order.
+  call: app.use_native_as(scene, "GRAPHICS_MESH_SCENE")
+  call: app.use_native_as(Graphics.OpenGLTexture, "GRAPHICS_TEXTURE")
+  call: app.use_native_as(Graphics.OpenGLMesh, "GRAPHICS_MESH")
+  call: app.use_native_as(Graphics.OpenGLShader, "GRAPHICS_SHADER")
+  call: app.use_native_as(Graphics.GlfwInput, "GRAPHICS_INPUT")
+  call: app.use_native_as(Graphics.Transforms, "GRAPHICS_TRANSFORM")
+  call: app.use_native_as(Graphics.OpenGLRenderer, "GRAPHICS_RENDERER")
+  call: app.use_native_as(Graphics.GlfwWindow, "GRAPHICS_WINDOW")
+  call: assert(app.boot() == 1, "flOW graphics boot")
+
+  set window GRAPHICS_WINDOW: app.service("window")
+  set input GRAPHICS_INPUT: app.service("input")
+  set renderer GRAPHICS_RENDERER: app.service("renderer")
+  set shaders GRAPHICS_SHADER: app.service("shader")
+  set meshes GRAPHICS_MESH: app.service("mesh")
+  set textures GRAPHICS_TEXTURE: app.service("texture")
+  set transforms GRAPHICS_TRANSFORM: app.service("transforms")
+  set liveScene GRAPHICS_MESH_SCENE: app.service("scene")
+  call: assert(window.open(320, 240, "OW Graphics / Textured quad") == 1)
+
+  # Two-triangle indexed quad: x,y,z positions and UV coordinates.
+  set xyz: [0.0 - 0.8, 0.0 - 0.8, 0.0, 0.8, 0.0 - 0.8, 0.0, 0.8, 0.8, 0.0, 0.0 - 0.8, 0.8, 0.0]
+  set uv: [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0]
+  set indices: [0, 1, 2, 2, 3, 0]
+  # RGBA8, bottom-to-top rows. Red/green bottom, blue/yellow top.
+  set pixels: [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255]
+  set vertexSource: "#version 330 core\nlayout(location=0) in vec3 aPosition;\nlayout(location=1) in vec2 aUv;\nout vec2 vUv;\nuniform mat4 uModel;\nvoid main(){vUv=aUv;gl_Position=uModel*vec4(aPosition,1.0);}"
+  set fragmentSource: "#version 330 core\nin vec2 vUv;\nout vec4 pixel;\nuniform sampler2D uTexture;\nvoid main(){pixel=texture(uTexture,vUv);}"
+  set programId int: shaders.create(vertexSource, fragmentSource)
+  set meshId int: meshes.create_indexed(xyz, uv, indices)
+  set textureId int: textures.create_rgba8(2, 2, pixels)
+  call: assert(programId > 0, "linked GLSL")
+  call: assert(meshId > 0, "indexed vertex buffers")
+  call: assert(textureId > 0, "GPU texture upload")
+  set translation: transforms.translation(0.0, 0.0, 0.0)
+  set scaling: transforms.scaling(1.0, 1.0, 1.0)
+  set model: transforms.compose(translation, scaling)
+  call: assert(shaders.bind(programId) == 1)
+  call: assert(shaders.set_mat4(programId, "uModel", model) == 1, "mat4 model")
+  call: assert(shaders.set_int(programId, "uTexture", 0) == 1, "sampler slot")
+  call: assert(textures.bind(textureId, 0) == 1, "texture sampler binding")
+
+  call: assert(liveScene.render_frame(meshId) == 1, "indexed textured frame")
+  call: assert(window.present() == 1)
+  call: assert(textures.destroy(textureId) == 1)
+  call: assert(meshes.destroy(meshId) == 1)
+  call: assert(shaders.destroy(programId) == 1)
+  call: assert(app.stop() == 1)
+  print: "PASS: OW textured indexed quad, matrix, flOW modules and GPU resources"
