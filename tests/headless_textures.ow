@@ -20,10 +20,7 @@ main:
   call: assert(image > 0, "headless RGBA8 contract")
   call: assert(textures.create_rgba8(2, 2, [255, 0]) == 0, "size check")
   call: assert(textures.bind(image, 0) == 1, "texture binding contract")
-  set mesh int: meshes.create_indexed(
-    [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-    [0.0, 0.0, 1.0, 0.0, 0.0, 1.0],
-    [0, 1, 2])
+  set mesh int: meshes.create_indexed([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 1.0, 0.0, 0.0, 1.0], [0, 1, 2])
   call: assert(mesh > 0, "indexed mesh contract")
   set identity: transforms.identity()
   set translation: transforms.translation(0.25, 0.5, 0.0)
