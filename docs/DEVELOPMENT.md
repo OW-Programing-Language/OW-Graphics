@@ -189,3 +189,35 @@ Images are decoded on CPU and converted to bottom-row-first RGBA8 for OpenGL; PN
 The build verifies OW contracts and parent-child transform composition without GPU, decoder safety and both PNG/JPEG via CPU unit tests, and Mesa framebuffer pixels for **two separately tinted textured objects**, plus an end-to-end OW→flOW→OpenGL two-object example. See [Materials & Scenes](MATERIALS-AND-SCENES.md).
 
 **Not implemented:** MTL material files, glTF, gamma-aware image pipelines, PBR maps, batching/instanced draws, scene animations, shadows, or a Vulkan backend.
+
+## 8. Phase 7 — static glTF 2.0, direct-light PBR and instancing
+
+This milestone loads a **real embedded-buffer glTF 2.0 file** in [`gltf_instancing`](../examples/gltf_instancing/main.ow), uploads its indexed geometry, and renders three copies with two OpenGL draw calls. Two copies share a metallic-gold material while the third uses imported `baseColorFactor`, `metallicFactor`, `roughnessFactor`. The middle copy moves along an original pure OW translation keyframe animation.
+
+```sh
+ow deps install
+ow run tests/headless_pbr_animation.ow
+ow check examples/gltf_instancing/main.ow
+mvn -f native-bridge/pom.xml test
+# From repository root, with the OW runtime and native bridge built:
+java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/ow-graphics-native-0.1.0-SNAPSHOT.jar:native-bridge/target/lib/*" dev.oreo.Main run examples/gltf_instancing/main.ow
+```
+
+`GRAPHICS_GLTF_MODEL.load_gltf("relative/file.gltf")` or `parse_gltf(json)` returns:
+
+```text
+[positionsXYZ, uvPairs, normalXYZ, triangleIndices,
+ baseColorRGBA, metallicFactor, roughnessFactor]
+```
+
+The importer supports **one mesh with one TRIANGLES primitive**, embedded base64 `data:application/octet-stream` buffer only; FLOAT VEC3 positions/normals, FLOAT VEC2 UVs and unsigned BYTE/SHORT/INT indices, with bufferView offsets and strides. If normals are absent, they are reconstructed from triangles; absent UVs default to zeros. It extracts base color and metallic/roughness scalar factors. Its strict bounds are **1 MiB JSON**, **4 MiB decoded buffer**, **100,000 vertices**, and the existing GPU index/position checks. File paths are relative to the working-directory project sandbox.
+
+It **does not yet support** external buffers, GLB, multiple meshes/primitives, glTF scene nodes, skins, morph targets, glTF animation channels, texture extensions or PBR texture maps. Do not claim glTF-compliant importing outside this subset.
+
+`GRAPHICS_KEYFRAME_ANIMATION.translation(times, positions, time)` linearly interpolates keyframe xyz vectors, clamps before/after endpoints, checks increasing time and is pure OW. It accepts max 1024 keys. The example advances time each frame (not a delta-time-correct clock); proper animation scheduling and glTF animation import remain future work.
+
+`GRAPHICS_MESH.draw_instanced(mesh, [modelMatrixA, modelMatrixB, ...])` accepts 1–512 finite 16-number matrices and makes a single native GL instanced draw for each invocation. GLSL must declare `layout(location=3) in mat4 aInstance;` (attribute slots 3,4,5,6). Mesh instance buffers persist between draws, and are cleaned with the mesh/context. This reduces draw-call overhead for repeated geometry; it does **not** automatically batch different shaders/materials/textures.
+
+The PBR-inspired GLSL sample implements **direct-light GGX normal distribution, Schlick Fresnel, Smith geometry and metallic/roughness** with tone mapping. It is a deliberately restricted shading demonstration without image-based lighting, HDR environment maps, shadow maps, color-managed texture pipelines or glTF material texture maps.
+
+Verification includes static glTF CPU parser validation and sandbox tests, OW/flOW keyframes/PBR contract tests, real GPU framebuffer proof of two instances, and full OW→flOW→GLFW→OpenGL instanced example. See [glTF & Instancing](GLTF-AND-INSTANCING.md).
