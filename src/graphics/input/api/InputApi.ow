@@ -1,0 +1,4 @@
+# Input abstraction used by OW applications.
+module_type GRAPHICS_INPUT:
+  include NATIVE_LIFECYCLE
+  fn escape_pressed() -> int
