@@ -26,6 +26,7 @@ main:
   call: assert(program > 0, "headless shader contract")
   call: assert(triangle > 0, "headless mesh contract")
   call: assert(shaders.bind(program) == 1)
+  call: assert(shaders.set_vec4(program, "uTint", 0.20, 0.74, 0.86, 1.0) == 1)
   call: assert(liveScene.render_frame(triangle) == 1)
   call: assert(app.disable("renderer") == 0, "scene depends on renderer")
   call: assert(meshes.destroy(triangle) == 1)

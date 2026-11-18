@@ -33,11 +33,13 @@ main:
   call: assert(window.open(960, 540, "OW Graphics / Programmable") == 1)
 
   set vertexSource: "#version 330 core\nlayout (location = 0) in vec3 aPosition;\nvoid main() { gl_Position = vec4(aPosition, 1.0); }"
-  set fragmentSource: "#version 330 core\nout vec4 pixel;\nvoid main() { pixel = vec4(0.20, 0.74, 0.86, 1.0); }"
+  set fragmentSource: "#version 330 core\nuniform vec4 uTint;\nout vec4 pixel;\nvoid main() { pixel = uTint; }"
   set shaderId int: shaders.create(vertexSource, fragmentSource)
   set meshId int: meshes.create([-0.65, -0.55, 0.0, 0.65, -0.55, 0.0, 0.0, 0.68, 0.0])
   call: assert(shaderId > 0, "GLSL compilation and linking")
   call: assert(meshId > 0, "upload vertex positions")
+  call: assert(shaders.bind(shaderId) == 1)
+  call: assert(shaders.set_vec4(shaderId, "uTint", 0.20, 0.74, 0.86, 1.0) == 1, "upload color uniform")
 
   while: window.should_close() == 0
     call: window.poll()

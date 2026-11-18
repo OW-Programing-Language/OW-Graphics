@@ -4,4 +4,5 @@ module_type GRAPHICS_SHADER:
   include NATIVE_LIFECYCLE
   fn create(vertexSource string, fragmentSource string) -> int
   fn bind(handle int) -> int
+  fn set_vec4(handle int, name string, r float, g float, b float, a float) -> int
   fn destroy(handle int) -> int
