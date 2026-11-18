@@ -3,6 +3,7 @@ package org.owgraphics.runtime;
 import dev.oreo.RuntimeExtension;
 import java.nio.FloatBuffer;
 import java.util.List;
+import java.nio.file.Path;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL;
@@ -21,6 +22,10 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
     private Thread owner;
     private boolean glfwInitialized;
     private boolean contextReady;
+    private boolean cursorInitialized;
+    private double previousCursorX;
+    private double previousCursorY;
+    private double accumulatedScroll;
     private int program;
     private int vertexArray;
     private int vertexBuffer;
@@ -39,7 +44,9 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
                  "graphics.mesh.create", "graphics.mesh.create_indexed", "graphics.mesh.create_lit_indexed",
                  "graphics.mesh.draw", "graphics.mesh.destroy",
                  "graphics.texture.create_rgba8", "graphics.texture.bind",
-                 "graphics.texture.destroy" -> true;
+                 "graphics.texture.destroy", "graphics.input.key_down",
+                 "graphics.input.cursor_delta", "graphics.input.scroll_delta",
+                 "graphics.model.parse_obj", "graphics.model.load_obj" -> true;
             default -> false;
         };
     }
@@ -56,6 +63,11 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.window.close" -> closeWindow(args);
             case "graphics.window.request_close" -> requestClose(args);
             case "graphics.input.escape" -> escapePressed(args);
+            case "graphics.input.key_down" -> keyDown(args);
+            case "graphics.input.cursor_delta" -> cursorDelta(args);
+            case "graphics.input.scroll_delta" -> scrollDelta(args);
+            case "graphics.model.parse_obj" -> parseObj(args);
+            case "graphics.model.load_obj" -> loadObj(args);
             case "graphics.opengl.clear" -> clearFrame(args);
             case "graphics.opengl.depth_test" -> configureDepth(args);
             case "graphics.opengl.triangle" -> drawTriangle(args);
@@ -143,6 +155,12 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             GL.createCapabilities();
             contextReady = true;
             glfwSwapInterval(1);
+            glfwSetScrollCallback(window, (handle, dx, dy) -> {
+                if (Double.isFinite(dy))
+                    accumulatedScroll = Math.max(-1000.0, Math.min(1000.0, accumulatedScroll + dy));
+            });
+            cursorInitialized = false;
+            accumulatedScroll = 0.0;
             glfwShowWindow(window);
             return 1;
         } catch (RuntimeException | Error ex) {
@@ -175,6 +193,76 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
         count(args, 0);
         ensureOwner();
         return glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS ? 1 : 0;
+    }
+
+    /**
+     * Case-sensitive named keys prevent passing unvalidated arbitrary GLFW
+     * key codes across the OW/native boundary.
+     */
+    private int keyDown(List<Object> args) {
+        count(args, 1);
+        String name = GraphicsArguments.string(args.get(0), "key");
+        int key = switch (name) {
+            case "ESCAPE" -> GLFW_KEY_ESCAPE;
+            case "W" -> GLFW_KEY_W;
+            case "A" -> GLFW_KEY_A;
+            case "S" -> GLFW_KEY_S;
+            case "D" -> GLFW_KEY_D;
+            case "LEFT" -> GLFW_KEY_LEFT;
+            case "RIGHT" -> GLFW_KEY_RIGHT;
+            case "UP" -> GLFW_KEY_UP;
+            case "DOWN" -> GLFW_KEY_DOWN;
+            case "SPACE" -> GLFW_KEY_SPACE;
+            case "LEFT_SHIFT" -> GLFW_KEY_LEFT_SHIFT;
+            default -> throw new IllegalArgumentException("Unsupported graphics key: " + name);
+        };
+        ensureOwner();
+        return glfwGetKey(window, key) == GLFW_PRESS ? 1 : 0;
+    }
+
+    private List<Double> cursorDelta(List<Object> args) {
+        count(args, 0);
+        ensureOwner();
+        try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+            var x = stack.mallocDouble(1);
+            var y = stack.mallocDouble(1);
+            glfwGetCursorPos(window, x, y);
+            double currentX = x.get(0);
+            double currentY = y.get(0);
+            if (!Double.isFinite(currentX) || !Double.isFinite(currentY))
+                throw new IllegalStateException("GLFW returned invalid cursor coordinates");
+            if (!cursorInitialized) {
+                cursorInitialized = true;
+                previousCursorX = currentX;
+                previousCursorY = currentY;
+                return List.of(0.0, 0.0);
+            }
+            double dx = currentX - previousCursorX;
+            double dy = currentY - previousCursorY;
+            previousCursorX = currentX;
+            previousCursorY = currentY;
+            return List.of(dx, dy);
+        }
+    }
+
+    private double scrollDelta(List<Object> args) {
+        count(args, 0);
+        ensureOwner();
+        double delta = accumulatedScroll;
+        accumulatedScroll = 0.0;
+        return delta;
+    }
+
+    private List<Object> parseObj(List<Object> args) {
+        count(args, 1);
+        String source = GraphicsArguments.string(args.get(0), "OBJ source");
+        return ObjModelParser.parse(source);
+    }
+
+    private List<Object> loadObj(List<Object> args) {
+        count(args, 1);
+        String filename = GraphicsArguments.string(args.get(0), "OBJ path");
+        return ObjModelParser.loadRelative(filename, Path.of("").toAbsolutePath());
     }
 
     private int clearFrame(List<Object> args) {
@@ -426,8 +514,11 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             }
             program = vertexBuffer = vertexArray = 0;
             contextReady = false;
+            org.lwjgl.glfw.Callbacks.glfwFreeCallbacks(window);
             glfwDestroyWindow(window);
             window = 0L;
+            cursorInitialized = false;
+            accumulatedScroll = 0.0;
         }
         if (glfwInitialized) {
             glfwTerminate();
