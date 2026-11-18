@@ -1,0 +1,6 @@
+# Pure OW material presets consumed through GLSL uniforms by the application.
+# Material properties: [ambient, diffuse, specular, shininess].
+module_type GRAPHICS_MATERIAL_LIBRARY:
+  include NATIVE_LIFECYCLE
+  fn tint(name string) -> array
+  fn properties(name string) -> array

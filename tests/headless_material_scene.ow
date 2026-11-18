@@ -1,0 +1,41 @@
+# Material presets and hierarchical transforms require no GPU or JVM adapter.
+import "@flow/src/App.ow"
+import "../src/graphics/math/api/TransformApi.ow"
+import "../src/graphics/math/infra/Transforms.ow"
+import "../src/graphics/material/api/MaterialApi.ow"
+import "../src/graphics/material/infra/StudioMaterials.ow"
+import "../src/graphics/scene/api/SceneGraphApi.ow"
+import "../src/graphics/scene/infra/MakeSceneGraph.ow"
+
+main:
+  set graph GRAPHICS_SCENE_GRAPH: MakeSceneGraph(Graphics.Transforms)
+  set app: new App()
+  call: app.use_native_as(graph, "GRAPHICS_SCENE_GRAPH")
+  call: app.use_native_as(Graphics.StudioMaterials, "GRAPHICS_MATERIAL_LIBRARY")
+  call: app.use_native_as(Graphics.Transforms, "GRAPHICS_TRANSFORM")
+  call: assert(app.boot() == 1, "typed scene graph boot")
+  set mats GRAPHICS_MATERIAL_LIBRARY: app.service("materials")
+  set world GRAPHICS_SCENE_GRAPH: app.service("scene_graph")
+  set transforms GRAPHICS_TRANSFORM: app.service("transforms")
+  set local0: transforms.translation(0.0 - 1.0, 0.0, 0.0)
+  set local1: transforms.translation(2.0, 0.25, 0.0)
+  set local2: transforms.scaling(0.5, 0.5, 0.5)
+  set matrices: world.resolve([0 - 1, 0, 1], [local0, local1, local2])
+  call: assert(len(matrices) == 3, "three scene nodes")
+  call: assert(matrices[0][12] == 0.0 - 1.0, "parent world x")
+  call: assert(matrices[1][12] == 1.0, "child inherits translation")
+  call: assert(matrices[1][13] == 0.25, "child y offset")
+  call: assert(matrices[2][0] == 0.5, "grandchild scales")
+  call: assert(matrices[2][12] == 1.0, "grandchild position inherits")
+  call: assert(len(world.resolve([], [])) == 0, "empty graph supported")
+  set copper: mats.tint("copper")
+  set azure: mats.tint("azure")
+  set gloss: mats.properties("azure")
+  call: assert(len(copper) == 4)
+  call: assert(len(gloss) == 4)
+  call: assert(copper[0] > azure[0], "different material red channels")
+  call: assert(azure[2] > copper[2], "different material blue channels")
+  call: assert(gloss[3] > 0.0, "positive shininess")
+  call: assert(app.disable("transforms") == 0, "scene graph needs transform service")
+  call: assert(app.stop() == 1)
+  print: "PASS: OW/flOW material presets and 3-node scene hierarchy"
