@@ -1,0 +1,107 @@
+# Phase 6: imported PNG texture, per-object materials, parent-child scene.
+# Run from OW-Graphics repository root with the LWJGL runtime extension.
+import "@flow/src/App.ow"
+import "../../src/graphics/window/api/WindowApi.ow"
+import "../../src/graphics/window/infra/GlfwWindow.ow"
+import "../../src/graphics/input/api/InputApi.ow"
+import "../../src/graphics/input/infra/GlfwInput.ow"
+import "../../src/graphics/renderer/api/RendererApi.ow"
+import "../../src/graphics/renderer/opengl/OpenGLRenderer.ow"
+import "../../src/graphics/shader/api/ShaderApi.ow"
+import "../../src/graphics/shader/opengl/OpenGLShader.ow"
+import "../../src/graphics/mesh/api/MeshApi.ow"
+import "../../src/graphics/mesh/opengl/OpenGLMesh.ow"
+import "../../src/graphics/texture/api/TextureApi.ow"
+import "../../src/graphics/texture/opengl/OpenGLTexture.ow"
+import "../../src/graphics/math/api/TransformApi.ow"
+import "../../src/graphics/math/infra/Transforms.ow"
+import "../../src/graphics/camera/api/CameraApi.ow"
+import "../../src/graphics/camera/infra/Camera.ow"
+import "../../src/graphics/material/api/MaterialApi.ow"
+import "../../src/graphics/material/infra/StudioMaterials.ow"
+import "../../src/graphics/model/api/ModelApi.ow"
+import "../../src/graphics/model/infra/ObjModel.ow"
+import "../../src/graphics/scene/api/SceneGraphApi.ow"
+import "../../src/graphics/scene/infra/MakeSceneGraph.ow"
+import "../../src/graphics/scene/api/MultiSceneApi.ow"
+import "../../src/graphics/scene/infra/MakeMultiScene.ow"
+
+main:
+  set graph GRAPHICS_SCENE_GRAPH: MakeSceneGraph(Graphics.Transforms)
+  set scene GRAPHICS_MULTI_SCENE: MakeMultiScene(Graphics.OpenGLRenderer)
+  set app: new App()
+  call: app.use_native_as(graph, "GRAPHICS_SCENE_GRAPH")
+  call: app.use_native_as(scene, "GRAPHICS_MULTI_SCENE")
+  call: app.use_native_as(Graphics.StudioMaterials, "GRAPHICS_MATERIAL_LIBRARY")
+  call: app.use_native_as(Graphics.ObjModel, "GRAPHICS_MODEL")
+  call: app.use_native_as(Graphics.Camera, "GRAPHICS_CAMERA")
+  call: app.use_native_as(Graphics.Transforms, "GRAPHICS_TRANSFORM")
+  call: app.use_native_as(Graphics.OpenGLTexture, "GRAPHICS_TEXTURE")
+  call: app.use_native_as(Graphics.OpenGLMesh, "GRAPHICS_MESH")
+  call: app.use_native_as(Graphics.OpenGLShader, "GRAPHICS_SHADER")
+  call: app.use_native_as(Graphics.GlfwInput, "GRAPHICS_INPUT")
+  call: app.use_native_as(Graphics.OpenGLRenderer, "GRAPHICS_RENDERER")
+  call: app.use_native_as(Graphics.GlfwWindow, "GRAPHICS_WINDOW")
+  call: assert(app.boot() == 1, "phase 6 flOW module boot")
+
+  set window GRAPHICS_WINDOW: app.service("window")
+  set input GRAPHICS_INPUT: app.service("input")
+  set renderer GRAPHICS_RENDERER: app.service("renderer")
+  set shader GRAPHICS_SHADER: app.service("shader")
+  set meshes GRAPHICS_MESH: app.service("mesh")
+  set textures GRAPHICS_TEXTURE: app.service("texture")
+  set camera GRAPHICS_CAMERA: app.service("camera")
+  set transforms GRAPHICS_TRANSFORM: app.service("transforms")
+  set materials GRAPHICS_MATERIAL_LIBRARY: app.service("materials")
+  set importer GRAPHICS_MODEL: app.service("model")
+  set sceneGraph GRAPHICS_SCENE_GRAPH: app.service("scene_graph")
+  set drawing GRAPHICS_MULTI_SCENE: app.service("multi_scene")
+  call: assert(window.open(640, 480, "OW Graphics / Materials & Scene") == 1)
+  call: assert(renderer.depth_test(1) == 1)
+
+  set obj: importer.load_obj("examples/model_viewer/assets/pyramid.obj")
+  set meshId int: meshes.create_lit_indexed(obj[0], obj[1], obj[2], obj[3])
+  # Actual .png decoded into RGBA8 and uploaded to the current OpenGL context.
+  set textureId int: textures.load_image("examples/material_scene/assets/checker.png")
+  set vertexSource: "#version 330 core\nlayout(location=0) in vec3 pos;\nlayout(location=1) in vec2 uv;\nlayout(location=2) in vec3 normal;\nout vec2 vUv;\nout vec3 vNormal;\nout vec3 vPos;\nuniform mat4 uModel;\nuniform mat4 uView;\nuniform mat4 uProjection;\nvoid main(){vec4 world=uModel*vec4(pos,1.0);vPos=world.xyz;vUv=uv;vNormal=mat3(uModel)*normal;gl_Position=uProjection*uView*world;}"
+  set fragmentSource: "#version 330 core\nin vec2 vUv;\nin vec3 vNormal;\nin vec3 vPos;\nout vec4 pixel;\nuniform sampler2D uTexture;\nuniform vec4 uTint;\nuniform vec4 uMaterial;\nuniform vec4 uEye;\nvoid main(){vec3 n=normalize(vNormal);vec3 light=normalize(vec3(0.5,0.9,1.0));float diffuse=max(dot(n,light),0.0);vec3 v=normalize(uEye.xyz-vPos);vec3 halfDir=normalize(light+v);float specular=pow(max(dot(n,halfDir),0.0),uMaterial.w)*uMaterial.z;vec3 base=texture(uTexture,vUv).rgb*uTint.rgb;vec3 lit=base*(uMaterial.x+uMaterial.y*diffuse)+vec3(specular);pixel=vec4(lit,1.0);}"
+  set programId int: shader.create(vertexSource, fragmentSource)
+  call: assert(meshId > 0, "OBJ geometry")
+  call: assert(textureId > 0, "decoded PNG asset")
+  call: assert(programId > 0, "Phong material shader")
+  call: assert(shader.bind(programId) == 1)
+  set view: camera.look_at(0.0, 0.7, 5.3, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+  set projection: camera.perspective(1.0471975512, 1.333333333333, 0.1, 50.0)
+  call: assert(shader.set_mat4(programId, "uView", view) == 1)
+  call: assert(shader.set_mat4(programId, "uProjection", projection) == 1)
+  call: assert(shader.set_vec4(programId, "uEye", 0.0, 0.7, 5.3, 1.0) == 1)
+  call: assert(shader.set_int(programId, "uTexture", 0) == 1)
+  call: assert(textures.bind(textureId, 0) == 1)
+  set copper: materials.tint("copper")
+  set copperSurface: materials.properties("copper")
+  set azure: materials.tint("azure")
+  set azureSurface: materials.properties("azure")
+
+  set parent: transforms.translation(0.0 - 0.95, 0.0, 0.0)
+  set child: transforms.translation(1.9, 0.0, 0.0)
+  set world: sceneGraph.resolve([0 - 1, 0], [parent, child])
+  call: assert(len(world) == 2, "root + child scene nodes")
+  call: assert(world[0][12] < 0.0, "root positioned left")
+  call: assert(world[1][12] > 0.0, "child positioned right")
+  call: shader.bind(programId)
+  call: textures.bind(textureId, 0)
+  call: assert(drawing.begin_frame(16, 22, 34) == 1)
+  call: assert(shader.set_mat4(programId, "uModel", world[0]) == 1)
+  call: assert(shader.set_vec4(programId, "uTint", copper[0], copper[1], copper[2], copper[3]) == 1)
+  call: assert(shader.set_vec4(programId, "uMaterial", copperSurface[0], copperSurface[1], copperSurface[2], copperSurface[3]) == 1)
+  call: assert(drawing.draw_object(meshId) == 1, "draw first root model")
+  call: assert(shader.set_mat4(programId, "uModel", world[1]) == 1)
+  call: assert(shader.set_vec4(programId, "uTint", azure[0], azure[1], azure[2], azure[3]) == 1)
+  call: assert(shader.set_vec4(programId, "uMaterial", azureSurface[0], azureSurface[1], azureSurface[2], azureSurface[3]) == 1)
+  call: assert(drawing.draw_object(meshId) == 1, "draw second child model")
+  call: assert(window.present() == 1)
+  call: assert(textures.destroy(textureId) == 1)
+  call: assert(meshes.destroy(meshId) == 1)
+  call: assert(shader.destroy(programId) == 1)
+  call: assert(app.stop() == 1)
+  print: "PASS: PNG image, two material instances, scene graph and OW OpenGL rendering"
