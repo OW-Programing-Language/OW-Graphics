@@ -4,9 +4,15 @@ import "../src/graphics/math/api/TransformApi.ow"
 import "../src/graphics/math/infra/Transforms.ow"
 import "../src/graphics/camera/api/CameraApi.ow"
 import "../src/graphics/camera/infra/Camera.ow"
+import "../src/graphics/geometry/api/GeometryApi.ow"
+import "../src/graphics/geometry/infra/CubeGeometry.ow"
+import "../src/graphics/lighting/api/LightingApi.ow"
+import "../src/graphics/lighting/infra/Daylight.ow"
 
 main:
   set app: new App()
+  call: app.use_native_as(Graphics.CubeGeometry, "GRAPHICS_CUBE_GEOMETRY")
+  call: app.use_native_as(Graphics.Daylight, "GRAPHICS_LIGHTING")
   call: app.use_native_as(Graphics.Camera, "GRAPHICS_CAMERA")
   call: app.use_native_as(Graphics.Transforms, "GRAPHICS_TRANSFORM")
   call: assert(app.boot() == 1, "3D math service boot")
@@ -29,5 +35,16 @@ main:
   set model: math3d.compose(math3d.translation(0.0, 0.0, 0.0 - 2.5), rotate)
   set mvp: math3d.compose(projection, math3d.compose(view, model))
   call: assert(len(mvp) == 16, "MVP chain")
+  set geometry GRAPHICS_CUBE_GEOMETRY: app.service("geometry")
+  set lighting GRAPHICS_LIGHTING: app.service("lighting")
+  call: assert(len(geometry.positions()) == 72, "24 xyz face vertices")
+  call: assert(len(geometry.uvs()) == 48, "24 vertex UV pairs")
+  call: assert(len(geometry.normals()) == 72, "24 vertex normals")
+  call: assert(len(geometry.indices()) == 36, "12 indexed triangles")
+  set direction: lighting.direction()
+  set levels: lighting.levels()
+  call: assert(len(direction) == 3, "light vector")
+  call: assert(levels[0] > 0.0, "ambient lighting component")
+  call: assert(levels[1] > 0.0, "diffuse lighting component")
   call: assert(app.stop() == 1)
   print: "PASS: pure OW 3D camera, rotation and perspective contracts"
