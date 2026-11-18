@@ -1,0 +1,8 @@
+# Column-major OpenGL 4x4 matrix mathematics entirely in OW.
+# Compose(a,b) produces a*b, so b applies to points before a.
+module_type GRAPHICS_TRANSFORM:
+  include NATIVE_LIFECYCLE
+  fn identity() -> array
+  fn translation(x float, y float, z float) -> array
+  fn scaling(x float, y float, z float) -> array
+  fn compose(a array, b array) -> array

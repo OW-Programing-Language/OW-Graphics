@@ -1,0 +1,48 @@
+# Typed, pure OW transform calculations; no JVM or GPU calls.
+module Graphics.Transforms: GRAPHICS_TRANSFORM
+  fn name() -> string:
+    return: "transforms"
+  fn requires() -> array:
+    return: []
+  fn register() -> int:
+    return: 0
+  fn start() -> int:
+    return: 0
+  fn stop() -> int:
+    return: 0
+  fn reload() -> int:
+    return: 0
+  fn on_event(type string, payload int) -> int:
+    return: 0
+  fn identity() -> array:
+    return: [1.0, 0.0, 0.0, 0.0,
+             0.0, 1.0, 0.0, 0.0,
+             0.0, 0.0, 1.0, 0.0,
+             0.0, 0.0, 0.0, 1.0]
+  fn translation(x float, y float, z float) -> array:
+    return: [1.0, 0.0, 0.0, 0.0,
+             0.0, 1.0, 0.0, 0.0,
+             0.0, 0.0, 1.0, 0.0,
+             x, y, z, 1.0]
+  fn scaling(x float, y float, z float) -> array:
+    return: [x, 0.0, 0.0, 0.0,
+             0.0, y, 0.0, 0.0,
+             0.0, 0.0, z, 0.0,
+             0.0, 0.0, 0.0, 1.0]
+  fn compose(a array, b array) -> array:
+    call: assert(len(a) == 16, "left matrix must have 16 elements")
+    call: assert(len(b) == 16, "right matrix must have 16 elements")
+    set result: array(16, 0.0)
+    set col int: 0
+    while: col < 4
+      set row int: 0
+      while: row < 4
+        set cell float: 0.0
+        set k int: 0
+        while: k < 4
+          set cell: cell + a[k * 4 + row] * b[col * 4 + k]
+          set k: k + 1
+        set result[col * 4 + row]: cell
+        set row: row + 1
+      set col: col + 1
+    return: result

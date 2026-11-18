@@ -1,0 +1,7 @@
+# Pixels: RGBA8 row-major bytes in bottom-to-top OpenGL order.
+# Every handle belongs to one OW interpreter/context; no native pointers exposed.
+module_type GRAPHICS_TEXTURE:
+  include NATIVE_LIFECYCLE
+  fn create_rgba8(width int, height int, pixels array) -> int
+  fn bind(handle int, slot int) -> int
+  fn destroy(handle int) -> int
