@@ -3,5 +3,6 @@ module_type GRAPHICS_RENDERER:
   include NATIVE_LIFECYCLE
   fn backend() -> string
   fn clear(red int, green int, blue int) -> int
+  fn depth_test(enabled int) -> int
   fn draw_triangle() -> int
   fn draw_mesh(mesh int) -> int
