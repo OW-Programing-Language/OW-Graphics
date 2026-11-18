@@ -46,8 +46,8 @@ public final class TexturedGpuSmoke {
             invoke(gpu, "graphics.opengl.clear", 0, 0, 0);
             invoke(gpu, "graphics.shader.bind", shader);
             check(invoke(gpu, "graphics.shader.uniform_mat4", shader, "uModel",
-                    List.of(1.0,0.0,0.0,0.0, 0.0,1.0,0.0,0.0,
-                            0.0,0.0,1.0,0.0, 0.0,0.0,0.0,1.0)) == 1, "Matrix uniform");
+                    List.of(0.5,0.0,0.0,0.0, 0.0,0.5,0.0,0.0,
+                            0.0,0.0,1.0,0.0, 0.25,-0.1,0.0,1.0)) == 1, "Matrix uniform");
             check(invoke(gpu, "graphics.shader.uniform_int", shader, "uTexture", 0) == 1,
                     "Sampler uniform");
             check(invoke(gpu, "graphics.texture.bind", texture, 0) == 1,
@@ -55,10 +55,13 @@ public final class TexturedGpuSmoke {
             check(invoke(gpu, "graphics.mesh.draw", mesh) == 1,
                     "glDrawElements call");
             glFinish();
-            assertPixel(80, 60, 255, 0, 0);     // bottom-left
-            assertPixel(240, 60, 0, 255, 0);    // bottom-right
-            assertPixel(80, 180, 0, 0, 255);    // top-left
-            assertPixel(240, 180, 255, 255, 0); // top-right
+            // Nonidentity model matrix scales to 50% and translates (+0.25,-0.10).
+            // These four positions are inside the transformed textured quadrants.
+            assertPixel(180, 90, 255, 0, 0);     // bottom-left
+            assertPixel(220, 90, 0, 255, 0);     // bottom-right
+            assertPixel(180, 130, 0, 0, 255);    // top-left
+            assertPixel(220, 130, 255, 255, 0);  // top-right
+            assertPixel(80, 60, 0, 0, 0);        // background (outside moved mesh)
 
             check(invoke(gpu, "graphics.texture.destroy", texture) == 1, "release texture");
             check(invoke(gpu, "graphics.mesh.destroy", mesh) == 1, "release index buffers");
