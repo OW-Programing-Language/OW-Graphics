@@ -34,8 +34,12 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
                  "graphics.window.close", "graphics.window.request_close",
                  "graphics.input.escape", "graphics.opengl.clear", "graphics.opengl.triangle",
                  "graphics.shader.create", "graphics.shader.bind",
-                 "graphics.shader.uniform4", "graphics.shader.destroy",
-                 "graphics.mesh.create", "graphics.mesh.draw", "graphics.mesh.destroy" -> true;
+                 "graphics.shader.uniform4", "graphics.shader.uniform_mat4",
+                 "graphics.shader.uniform_int", "graphics.shader.destroy",
+                 "graphics.mesh.create", "graphics.mesh.create_indexed",
+                 "graphics.mesh.draw", "graphics.mesh.destroy",
+                 "graphics.texture.create_rgba8", "graphics.texture.bind",
+                 "graphics.texture.destroy" -> true;
             default -> false;
         };
     }
@@ -57,10 +61,16 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.shader.create" -> createShader(args);
             case "graphics.shader.bind" -> bindShader(args);
             case "graphics.shader.uniform4" -> setShaderVec4(args);
+            case "graphics.shader.uniform_mat4" -> setShaderMat4(args);
+            case "graphics.shader.uniform_int" -> setShaderInt(args);
             case "graphics.shader.destroy" -> destroyShader(args);
             case "graphics.mesh.create" -> createMesh(args);
+            case "graphics.mesh.create_indexed" -> createIndexedMesh(args);
             case "graphics.mesh.draw" -> drawMesh(args);
             case "graphics.mesh.destroy" -> destroyMesh(args);
+            case "graphics.texture.create_rgba8" -> createTexture(args);
+            case "graphics.texture.bind" -> bindTexture(args);
+            case "graphics.texture.destroy" -> destroyTexture(args);
             default -> throw new AssertionError("Unreachable graphics operation");
         };
     }
@@ -285,6 +295,24 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
         return resources.uniform4(handle, name, r, g, b, a);
     }
 
+    private int setShaderMat4(List<Object> args) {
+        count(args, 3);
+        int handle = GraphicsArguments.integer(args.get(0), "shader handle");
+        String name = GraphicsArguments.string(args.get(1), "uniform name");
+        float[] values = GraphicsArguments.matrix4(args.get(2));
+        ensureOwner();
+        return resources.uniformMatrix4(handle, name, values);
+    }
+
+    private int setShaderInt(List<Object> args) {
+        count(args, 3);
+        int handle = GraphicsArguments.integer(args.get(0), "shader handle");
+        String name = GraphicsArguments.string(args.get(1), "uniform name");
+        int value = GraphicsArguments.integer(args.get(2), "uniform value");
+        ensureOwner();
+        return resources.uniformInt(handle, name, value);
+    }
+
     private int destroyShader(List<Object> args) {
         count(args, 1);
         int handle = GraphicsArguments.integer(args.get(0), "shader handle");
@@ -298,6 +326,37 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
         float[] positions = GraphicsArguments.trianglePositions(args.get(0));
         ensureOwner();
         return resources.createMesh(positions);
+    }
+
+    private int createIndexedMesh(List<Object> args) {
+        count(args, 3);
+        var geometry = GraphicsArguments.indexedGeometry(args.get(0), args.get(1), args.get(2));
+        ensureOwner();
+        return resources.createIndexedMesh(geometry);
+    }
+
+    private int createTexture(List<Object> args) {
+        count(args, 3);
+        var image = GraphicsArguments.rgba8(args.get(0), args.get(1), args.get(2));
+        ensureOwner();
+        return resources.createTexture(image);
+    }
+
+    private int bindTexture(List<Object> args) {
+        count(args, 2);
+        int handle = GraphicsArguments.integer(args.get(0), "texture handle");
+        int slot = GraphicsArguments.integer(args.get(1), "texture slot");
+        ensureOwner();
+        resources.bindTexture(handle, slot);
+        return 1;
+    }
+
+    private int destroyTexture(List<Object> args) {
+        count(args, 1);
+        int handle = GraphicsArguments.integer(args.get(0), "texture handle");
+        ensureOwner();
+        resources.destroyTexture(handle);
+        return 1;
     }
 
     private int drawMesh(List<Object> args) {

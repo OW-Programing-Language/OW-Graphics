@@ -2,7 +2,7 @@
 
 **A modular graphics toolkit for the OW programming language, built with flOW.**
 
-OW Graphics provides typed OW modules for windows, input, rendering and scene composition. The first backend targets **OpenGL 3.3** through an installable Java runtime extension using **LWJGL + native GLFW/OpenGL libraries**. Applications can now supply their own GLSL source, vertex position arrays and vec4 uniforms. A headless renderer exercises the same typed contracts without native libraries.
+OW Graphics provides typed OW modules for windows, input, rendering and scene composition. The first backend targets **OpenGL 3.3** through an installable Java runtime extension using **LWJGL + native GLFW/OpenGL libraries**. Applications can supply their own GLSL shaders, meshes, vec4/sampler/mat4 uniforms, RGBA8 textures and indexed geometry. A headless renderer exercises the same typed contracts without native libraries.
 
 > **Status: early development (v0.1 foundation).** This is not a complete graphics engine. Vulkan, production shader/texture APIs, native AOT output and cross-platform GUI tests are planned rather than claimed as complete.
 
@@ -20,11 +20,14 @@ src/graphics/
   input/{api,infra}/               # ESC key / event handling
   scene/{api,infra}/               # typed triangle / mesh scene functors
   shader/{api,opengl,headless}/    # GLSL program lifecycle, uniform vec4
-  mesh/{api,opengl,headless}/      # non-indexed triangle geometry
+  mesh/{api,opengl,headless}/      # non-indexed and indexed triangle geometry
+  texture/{api,opengl,headless}/   # RGBA8 texture ownership and bindings
+  math/{api,infra}/               # GPU-independent OW mat4 transforms
 native-bridge/                     # Maven Java RuntimeExtension + LWJGL natives
 tests/headless_flow.ow             # flOW integration without a display
 tests/headless_resources.ow        # GPU-free shader/mesh contract test
 examples/programmable_triangle/   # shaders + vertex array in OW
+examples/textured_quad/           # indexed geometry + RGBA8 + transforms
 docs/{ARCHITECTURE,DEVELOPMENT}.md
 ```
 
@@ -45,7 +48,7 @@ The test registers a scene **before** its renderer, checks flOW boot ordering, r
 
 Build the extension against a sibling checkout of `ow-lang` and then launch the OW interpreter with the provider on the Java classpath. Complete commands (Linux/macOS and Windows): **[Development guide](docs/DEVELOPMENT.md)**.
 
-The original GUI draws a built-in triangle. The new [`programmable_triangle`](examples/programmable_triangle/main.ow) example compiles GLSL provided by OW, uploads a triangle vertex array, sets a color uniform and renders it. Press **Escape** to exit.
+The original GUI draws a built-in triangle. [`programmable_triangle`](examples/programmable_triangle/main.ow) compiles custom GLSL. [`textured_quad`](examples/textured_quad/main.ow) adds a two-triangle indexed quad with UVs, an RGBA8 texture and model matrix, all configured in OW. Press **Escape** to exit.
 
 ## What is functional?
 
@@ -58,7 +61,8 @@ The original GUI draws a built-in triangle. The new [`programmable_triangle`](ex
 | GLFW + OpenGL 3.3 native bridge | Implemented, display test required |
 | Vulkan backend | Planned; not yet implemented |
 | Custom GLSL programs, RGB uniforms, non-indexed triangle meshes | Implemented (GUI validation pending) |
-| Textures, indexed meshes, matrices and 3D cameras | Planned |
+| RGBA8 textures, indexed UV meshes, column-major mat4 | First implementation; software GPU test |
+| 3D cameras, lighting, image loading, animation | Planned |
 | Native OW AOT/FFI integration | Awaiting compiler support |
 | Lockfile | Committed and SHA-pinned |
 

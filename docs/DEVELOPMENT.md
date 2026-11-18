@@ -62,3 +62,24 @@ java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/ow-graphics-native-0.
 The binding accepts **non-indexed GL_TRIANGLES** only: a flat array of x/y/z coordinates, with 9 numbers for each triangle (maximum 300,000 numbers). Shader source must be nonblank and at most 65,536 characters. GPU handles are scoped to the open window; stale and destroyed handles cause errors rather than silently invoking raw GL IDs. A vec4 uniform is set with `shader.set_vec4(handle, name, r, g, b, a)` after `shader.bind(handle)`.
 
 The new headless integration test checks flOW module/service startup without GL. JVM tests validate malformed shader and mesh inputs without opening a window. GUI rendering still requires a machine with an OpenGL 3.3 desktop context and manual validation.
+
+## 4. Indexed textured meshes and OW matrices
+
+`examples/textured_quad/main.ow` shows a two-triangle indexed square using a **single shared position+UV vertex buffer and EBO**, a 2×2 RGBA8 texture, sampler uniform, and column-major 4×4 matrix. `Graphics.Transforms` is implemented in OW, separate from the native OpenGL provider; flOW independently manages the Mesh, Shader, Texture, Transform, Renderer and Window modules.
+
+```sh
+ow check examples/textured_quad/main.ow
+ow run tests/headless_textures.ow
+java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/ow-graphics-native-0.1.0-SNAPSHOT.jar:native-bridge/target/lib/*" dev.oreo.Main run examples/textured_quad/main.ow
+```
+
+The OpenGL bridge validates **before GPU upload**:
+
+- `mesh.create_indexed(positions, uvs, indices)` takes XYZ triples, exactly two UV coordinates per vertex, and triangle index triples within vertex range; positions, UVs and indices are bounded.
+- `texture.create_rgba8(width, height, pixels)` accepts a flat integer array of `width * height * 4` RGBA channels (0–255), row-major with the **bottom row first**. Maximum dimension is 2048 per side. Filtering is nearest-neighbor and wrapping clamps to edges.
+- `shaders.set_mat4(program, name, values)` requires precisely 16 finite floats in **column-major** OpenGL order; `shaders.set_int` binds sampler units.
+- `transforms.identity()`, `translation(x,y,z)`, `scaling(x,y,z)` and `compose(a,b)` return 16-value OW arrays. Composition is `a * b`, with `b` applied first.
+
+`mvn -f native-bridge/pom.xml test` validates malformed inputs without a GPU. The Mesa/Xvfb CI tests four separate pixel colors of a real indexed textured quad **and** runs a complete OW+flOW native smoke application. Physical GPU and other-OS tests are still required.
+
+**Not implemented:** PNG/JPEG file reading, mipmaps, GPU-managed texture arrays, perspective cameras, lighting, Vulkan, arbitrary native LLVM output, or a full scene graph.

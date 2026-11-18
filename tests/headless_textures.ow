@@ -1,0 +1,38 @@
+# Includes math module plus flOW texture and indexed mesh contracts.
+import "@flow/src/App.ow"
+import "../src/graphics/mesh/api/MeshApi.ow"
+import "../src/graphics/mesh/headless/HeadlessMesh.ow"
+import "../src/graphics/texture/api/TextureApi.ow"
+import "../src/graphics/texture/headless/HeadlessTexture.ow"
+import "../src/graphics/math/api/TransformApi.ow"
+import "../src/graphics/math/infra/Transforms.ow"
+
+main:
+  set app: new App()
+  call: app.use_native_as(Graphics.Transforms, "GRAPHICS_TRANSFORM")
+  call: app.use_native_as(Graphics.HeadlessTexture, "GRAPHICS_TEXTURE")
+  call: app.use_native_as(Graphics.HeadlessMesh, "GRAPHICS_MESH")
+  call: assert(app.boot() == 1, "flOW starts texture, mesh and math modules")
+  set textures GRAPHICS_TEXTURE: app.service("texture")
+  set meshes GRAPHICS_MESH: app.service("mesh")
+  set transforms GRAPHICS_TRANSFORM: app.service("transforms")
+  set image int: textures.create_rgba8(1, 1, [255, 0, 0, 255])
+  call: assert(image > 0, "headless RGBA8 contract")
+  call: assert(textures.create_rgba8(2, 2, [255, 0]) == 0, "size check")
+  call: assert(textures.bind(image, 0) == 1, "texture binding contract")
+  set mesh int: meshes.create_indexed([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 1.0, 0.0, 0.0, 1.0], [0, 1, 2])
+  call: assert(mesh > 0, "indexed mesh contract")
+  set identity: transforms.identity()
+  set translation: transforms.translation(0.25, 0.5, 0.0)
+  set scale: transforms.scaling(0.5, 0.5, 1.0)
+  set model: transforms.compose(translation, scale)
+  call: assert(len(model) == 16, "column-major mat4")
+  call: assert(model[0] == 0.5, "x scale")
+  call: assert(model[5] == 0.5, "y scale")
+  call: assert(model[12] == 0.25, "x translation")
+  call: assert(model[13] == 0.5, "y translation")
+  call: assert(identity[0] == 1.0, "identity matrix")
+  call: assert(meshes.destroy(mesh) == 1)
+  call: assert(textures.destroy(image) == 1)
+  call: assert(app.stop() == 1)
+  print: "PASS: flOW graphics textures, indexed mesh and matrix contracts"
