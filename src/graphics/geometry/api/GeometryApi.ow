@@ -1,0 +1,7 @@
+# Models can be supplied as OW arrays and uploaded through GRAPHICS_MESH.
+module_type GRAPHICS_CUBE_GEOMETRY:
+  include NATIVE_LIFECYCLE
+  fn positions() -> array
+  fn uvs() -> array
+  fn normals() -> array
+  fn indices() -> array

@@ -43,6 +43,10 @@ jobs:
           java -jar ../ow-lang/target/OwIDE.jar run tests/headless_textures.ow
           java -jar ../ow-lang/target/OwIDE.jar check examples/textured_quad/main.ow
           java -jar ../ow-lang/target/OwIDE.jar check examples/textured_quad/smoke.ow
+          java -jar ../ow-lang/target/OwIDE.jar check tests/headless_3d.ow
+          java -jar ../ow-lang/target/OwIDE.jar run tests/headless_3d.ow
+          java -jar ../ow-lang/target/OwIDE.jar check examples/rotating_cube/main.ow
+          java -jar ../ow-lang/target/OwIDE.jar check examples/rotating_cube/smoke.ow
       - name: Compile and test native SPI bridge (no GPU)
         run: mvn -B -q -f ow-graphics/native-bridge/pom.xml test
       - name: Install Mesa software OpenGL for framebuffer integration smoke test
@@ -64,3 +68,9 @@ jobs:
           xvfb-run -a -s "-screen 0 800x600x24" env LIBGL_ALWAYS_SOFTWARE=1 \
             java -cp "ow-lang/target/OwIDE.jar:ow-graphics/native-bridge/target/test-classes:ow-graphics/native-bridge/target/classes:ow-graphics/native-bridge/target/lib/*" \
             dev.oreo.Main run ow-graphics/examples/textured_quad/smoke.ow
+          xvfb-run -a -s "-screen 0 800x600x24" env LIBGL_ALWAYS_SOFTWARE=1 \
+            java -cp "ow-lang/target/OwIDE.jar:ow-graphics/native-bridge/target/test-classes:ow-graphics/native-bridge/target/classes:ow-graphics/native-bridge/target/lib/*" \
+            dev.oreo.Main run ow-graphics/examples/rotating_cube/smoke.ow
+          xvfb-run -a -s "-screen 0 800x600x24" env LIBGL_ALWAYS_SOFTWARE=1 \
+            java -cp "ow-lang/target/OwIDE.jar:ow-graphics/native-bridge/target/test-classes:ow-graphics/native-bridge/target/classes:ow-graphics/native-bridge/target/lib/*" \
+            org.owgraphics.runtime.DepthLightingGpuSmoke

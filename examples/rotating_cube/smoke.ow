@@ -1,0 +1,88 @@
+# OW 3D demo: six textured cube faces, real depth buffer and diffuse lighting.
+# The single optional Java LWJGL RuntimeExtension stays behind typed OW interfaces.
+import "@flow/src/App.ow"
+import "../../src/graphics/window/api/WindowApi.ow"
+import "../../src/graphics/window/infra/GlfwWindow.ow"
+import "../../src/graphics/input/api/InputApi.ow"
+import "../../src/graphics/input/infra/GlfwInput.ow"
+import "../../src/graphics/renderer/api/RendererApi.ow"
+import "../../src/graphics/renderer/opengl/OpenGLRenderer.ow"
+import "../../src/graphics/shader/api/ShaderApi.ow"
+import "../../src/graphics/shader/opengl/OpenGLShader.ow"
+import "../../src/graphics/mesh/api/MeshApi.ow"
+import "../../src/graphics/mesh/opengl/OpenGLMesh.ow"
+import "../../src/graphics/texture/api/TextureApi.ow"
+import "../../src/graphics/texture/opengl/OpenGLTexture.ow"
+import "../../src/graphics/math/api/TransformApi.ow"
+import "../../src/graphics/math/infra/Transforms.ow"
+import "../../src/graphics/camera/api/CameraApi.ow"
+import "../../src/graphics/camera/infra/Camera.ow"
+import "../../src/graphics/geometry/api/GeometryApi.ow"
+import "../../src/graphics/geometry/infra/CubeGeometry.ow"
+import "../../src/graphics/lighting/api/LightingApi.ow"
+import "../../src/graphics/lighting/infra/Daylight.ow"
+import "../../src/graphics/scene/api/MeshSceneApi.ow"
+import "../../src/graphics/scene/infra/MakeMeshScene.ow"
+
+main:
+  set scene GRAPHICS_MESH_SCENE: MakeMeshScene(Graphics.OpenGLRenderer)
+  set app: new App()
+  # Deliberately register backwards; flOW boots in provider dependency order.
+  call: app.use_native_as(scene, "GRAPHICS_MESH_SCENE")
+  call: app.use_native_as(Graphics.CubeGeometry, "GRAPHICS_CUBE_GEOMETRY")
+  call: app.use_native_as(Graphics.Daylight, "GRAPHICS_LIGHTING")
+  call: app.use_native_as(Graphics.Camera, "GRAPHICS_CAMERA")
+  call: app.use_native_as(Graphics.Transforms, "GRAPHICS_TRANSFORM")
+  call: app.use_native_as(Graphics.OpenGLTexture, "GRAPHICS_TEXTURE")
+  call: app.use_native_as(Graphics.OpenGLMesh, "GRAPHICS_MESH")
+  call: app.use_native_as(Graphics.OpenGLShader, "GRAPHICS_SHADER")
+  call: app.use_native_as(Graphics.GlfwInput, "GRAPHICS_INPUT")
+  call: app.use_native_as(Graphics.OpenGLRenderer, "GRAPHICS_RENDERER")
+  call: app.use_native_as(Graphics.GlfwWindow, "GRAPHICS_WINDOW")
+  call: assert(app.boot() == 1, "3D graphics module boot")
+
+  set window GRAPHICS_WINDOW: app.service("window")
+  set input GRAPHICS_INPUT: app.service("input")
+  set renderer GRAPHICS_RENDERER: app.service("renderer")
+  set shader GRAPHICS_SHADER: app.service("shader")
+  set meshes GRAPHICS_MESH: app.service("mesh")
+  set textures GRAPHICS_TEXTURE: app.service("texture")
+  set camera GRAPHICS_CAMERA: app.service("camera")
+  set transforms GRAPHICS_TRANSFORM: app.service("transforms")
+  set geometry GRAPHICS_CUBE_GEOMETRY: app.service("geometry")
+  set lighting GRAPHICS_LIGHTING: app.service("lighting")
+  set liveScene GRAPHICS_MESH_SCENE: app.service("scene")
+  call: assert(window.open(640, 480, "OW Graphics / 3D Cube") == 1)
+  call: assert(renderer.depth_test(1) == 1, "enable OpenGL depth test")
+
+  set vertexSource: "#version 330 core\nlayout(location=0) in vec3 aPos;\nlayout(location=1) in vec2 aUv;\nlayout(location=2) in vec3 aNormal;\nout vec2 vUv;\nout vec3 vNormal;\nuniform mat4 uModel;\nuniform mat4 uView;\nuniform mat4 uProjection;\nvoid main(){vUv=aUv;vNormal=mat3(uModel)*aNormal;gl_Position=uProjection*uView*uModel*vec4(aPos,1.0);}"
+  set fragmentSource: "#version 330 core\nin vec2 vUv;\nin vec3 vNormal;\nout vec4 pixel;\nuniform sampler2D uTexture;\nuniform vec4 uLightDirection;\nuniform vec4 uLightLevels;\nvoid main(){float diffuse=max(dot(normalize(vNormal),normalize(uLightDirection.xyz)),0.0);float illumination=uLightLevels.x+uLightLevels.y*diffuse;pixel=vec4(texture(uTexture,vUv).rgb*illumination,1.0);}"
+
+  set shaderId int: shader.create(vertexSource, fragmentSource)
+  set meshId int: meshes.create_lit_indexed(geometry.positions(), geometry.uvs(), geometry.normals(), geometry.indices())
+  # 2x2 RGBA8: pale blue, mint, lavender and warm white.
+  set textureId int: textures.create_rgba8(2, 2, [190, 215, 255, 255, 160, 240, 205, 255, 225, 190, 245, 255, 255, 238, 200, 255])
+  call: assert(shaderId > 0, "GLSL compilation")
+  call: assert(meshId > 0, "uploaded 24 normal-bearing vertices and 36 indices")
+  call: assert(textureId > 0, "uploaded color texture")
+  call: assert(shader.bind(shaderId) == 1)
+  set view: camera.look_at(1.6, 1.2, 3.2, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+  set projection: camera.perspective(1.0471975512, 1.333333333333, 0.1, 50.0)
+  set direction: lighting.direction()
+  set levels: lighting.levels()
+  call: assert(shader.set_mat4(shaderId, "uView", view) == 1)
+  call: assert(shader.set_mat4(shaderId, "uProjection", projection) == 1)
+  call: assert(shader.set_int(shaderId, "uTexture", 0) == 1)
+  call: assert(shader.set_vec4(shaderId, "uLightDirection", direction[0], direction[1], direction[2], 0.0) == 1)
+  call: assert(shader.set_vec4(shaderId, "uLightLevels", levels[0], levels[1], 0.0, 0.0) == 1)
+  call: assert(textures.bind(textureId, 0) == 1)
+
+  set model: transforms.rotation_y(0.45)
+  call: assert(shader.set_mat4(shaderId, "uModel", model) == 1)
+  call: assert(liveScene.render_frame(meshId) == 1)
+  call: assert(window.present() == 1)
+  call: assert(textures.destroy(textureId) == 1)
+  call: assert(meshes.destroy(meshId) == 1)
+  call: assert(shader.destroy(shaderId) == 1)
+  call: assert(app.stop() == 1)
+  print: "PASS: OW 3D camera, lit cube, depth, flOW and GPU cleanup"

@@ -159,6 +159,19 @@ final class OpenGlResources {
     }
 
     int createIndexedMesh(GraphicsArguments.IndexedGeometry geometry) {
+        return uploadIndexedMesh(geometry, null);
+    }
+
+    int createLitMesh(GraphicsArguments.LitGeometry lit) {
+        return uploadIndexedMesh(lit.base(), lit.normals());
+    }
+
+    /**
+     * Vertex layout: xyz at location 0, UV at 1, optional normal xyz at 2.
+     * Each face of a box can have separate vertex normals while still sharing
+     * corner positions only within that face. Existing 5-float meshes remain valid.
+     */
+    private int uploadIndexedMesh(GraphicsArguments.IndexedGeometry geometry, float[] normals) {
         int vao = 0, vbo = 0, ebo = 0;
         boolean success = false;
         try {
@@ -172,13 +185,19 @@ final class OpenGlResources {
             float[] uv = geometry.uvs();
             int[] indices = geometry.indices();
             int vertexCount = positions.length / 3;
-            FloatBuffer interleaved = BufferUtils.createFloatBuffer(vertexCount * 5);
+            int stride = normals == null ? 5 : 8;
+            FloatBuffer interleaved = BufferUtils.createFloatBuffer(vertexCount * stride);
             for (int i = 0; i < vertexCount; i++) {
                 interleaved.put(positions[i * 3]);
                 interleaved.put(positions[i * 3 + 1]);
                 interleaved.put(positions[i * 3 + 2]);
                 interleaved.put(uv[i * 2]);
                 interleaved.put(uv[i * 2 + 1]);
+                if (normals != null) {
+                    interleaved.put(normals[i * 3]);
+                    interleaved.put(normals[i * 3 + 1]);
+                    interleaved.put(normals[i * 3 + 2]);
+                }
             }
             interleaved.flip();
             IntBuffer elements = BufferUtils.createIntBuffer(indices.length);
@@ -186,10 +205,14 @@ final class OpenGlResources {
             glBindVertexArray(vao);
             glBindBuffer(GL_ARRAY_BUFFER, vbo);
             glBufferData(GL_ARRAY_BUFFER, interleaved, GL_STATIC_DRAW);
-            glVertexAttribPointer(0, 3, GL_FLOAT, false, 5 * Float.BYTES, 0L);
+            glVertexAttribPointer(0, 3, GL_FLOAT, false, stride * Float.BYTES, 0L);
             glEnableVertexAttribArray(0);
-            glVertexAttribPointer(1, 2, GL_FLOAT, false, 5 * Float.BYTES, 3L * Float.BYTES);
+            glVertexAttribPointer(1, 2, GL_FLOAT, false, stride * Float.BYTES, 3L * Float.BYTES);
             glEnableVertexAttribArray(1);
+            if (normals != null) {
+                glVertexAttribPointer(2, 3, GL_FLOAT, false, stride * Float.BYTES, 5L * Float.BYTES);
+                glEnableVertexAttribArray(2);
+            }
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, elements, GL_STATIC_DRAW);
             int handle = allocateHandle();

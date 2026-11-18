@@ -32,11 +32,11 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.window.open", "graphics.window.poll",
                  "graphics.window.present", "graphics.window.should_close",
                  "graphics.window.close", "graphics.window.request_close",
-                 "graphics.input.escape", "graphics.opengl.clear", "graphics.opengl.triangle",
+                 "graphics.input.escape", "graphics.opengl.clear", "graphics.opengl.depth_test", "graphics.opengl.triangle",
                  "graphics.shader.create", "graphics.shader.bind",
                  "graphics.shader.uniform4", "graphics.shader.uniform_mat4",
                  "graphics.shader.uniform_int", "graphics.shader.destroy",
-                 "graphics.mesh.create", "graphics.mesh.create_indexed",
+                 "graphics.mesh.create", "graphics.mesh.create_indexed", "graphics.mesh.create_lit_indexed",
                  "graphics.mesh.draw", "graphics.mesh.destroy",
                  "graphics.texture.create_rgba8", "graphics.texture.bind",
                  "graphics.texture.destroy" -> true;
@@ -57,6 +57,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.window.request_close" -> requestClose(args);
             case "graphics.input.escape" -> escapePressed(args);
             case "graphics.opengl.clear" -> clearFrame(args);
+            case "graphics.opengl.depth_test" -> configureDepth(args);
             case "graphics.opengl.triangle" -> drawTriangle(args);
             case "graphics.shader.create" -> createShader(args);
             case "graphics.shader.bind" -> bindShader(args);
@@ -66,6 +67,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.shader.destroy" -> destroyShader(args);
             case "graphics.mesh.create" -> createMesh(args);
             case "graphics.mesh.create_indexed" -> createIndexedMesh(args);
+            case "graphics.mesh.create_lit_indexed" -> createLitMesh(args);
             case "graphics.mesh.draw" -> drawMesh(args);
             case "graphics.mesh.destroy" -> destroyMesh(args);
             case "graphics.texture.create_rgba8" -> createTexture(args);
@@ -132,6 +134,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
             glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
             glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
+            glfwWindowHint(GLFW_DEPTH_BITS, 24);
             glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
             window = glfwCreateWindow(width, height, title, 0L, 0L);
             if (window == 0L)
@@ -189,7 +192,24 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             glViewport(0, 0, w.get(0), h.get(0));
         }
         glClearColor(r / 255f, g / 255f, b / 255f, 1f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        return 1;
+    }
+
+    /** Opt-in depth testing: older OW 2D demos keep their original behavior. */
+    private int configureDepth(List<Object> args) {
+        count(args, 1);
+        int enabled = GraphicsArguments.integer(args.get(0), "depth enabled");
+        if (enabled != 0 && enabled != 1)
+            throw new IllegalArgumentException("depth_test accepts only 0 or 1");
+        ensureOwner();
+        if (enabled == 1) {
+            glEnable(GL_DEPTH_TEST);
+            glDepthFunc(GL_LESS);
+            glClearDepth(1.0);
+        } else {
+            glDisable(GL_DEPTH_TEST);
+        }
         return 1;
     }
 
@@ -333,6 +353,14 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
         var geometry = GraphicsArguments.indexedGeometry(args.get(0), args.get(1), args.get(2));
         ensureOwner();
         return resources.createIndexedMesh(geometry);
+    }
+
+    private int createLitMesh(List<Object> args) {
+        count(args, 4);
+        var geometry = GraphicsArguments.litGeometry(
+                args.get(0), args.get(1), args.get(2), args.get(3));
+        ensureOwner();
+        return resources.createLitMesh(geometry);
     }
 
     private int createTexture(List<Object> args) {

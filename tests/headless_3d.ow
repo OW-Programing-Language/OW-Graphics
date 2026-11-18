@@ -1,0 +1,50 @@
+# Tests actual OW view, perspective, rotation and flOW lifecycle without a GPU.
+import "@flow/src/App.ow"
+import "../src/graphics/math/api/TransformApi.ow"
+import "../src/graphics/math/infra/Transforms.ow"
+import "../src/graphics/camera/api/CameraApi.ow"
+import "../src/graphics/camera/infra/Camera.ow"
+import "../src/graphics/geometry/api/GeometryApi.ow"
+import "../src/graphics/geometry/infra/CubeGeometry.ow"
+import "../src/graphics/lighting/api/LightingApi.ow"
+import "../src/graphics/lighting/infra/Daylight.ow"
+
+main:
+  set app: new App()
+  call: app.use_native_as(Graphics.CubeGeometry, "GRAPHICS_CUBE_GEOMETRY")
+  call: app.use_native_as(Graphics.Daylight, "GRAPHICS_LIGHTING")
+  call: app.use_native_as(Graphics.Camera, "GRAPHICS_CAMERA")
+  call: app.use_native_as(Graphics.Transforms, "GRAPHICS_TRANSFORM")
+  call: assert(app.boot() == 1, "3D math service boot")
+  set camera GRAPHICS_CAMERA: app.service("camera")
+  set math3d GRAPHICS_TRANSFORM: app.service("transforms")
+  set view: camera.look_at(0.0, 0.0, 3.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+  set simpleView: camera.view_from_position(0.0, 0.0, 3.0)
+  call: assert(view[14] < 0.0 - 2.999, "camera z is in view translation")
+  call: assert(simpleView[14] == 0.0 - 3.0, "translated default camera")
+  call: assert(view[0] > 0.999, "look_at right vector")
+  set projection: camera.perspective(1.0471975512, 1.333333333333, 0.1, 100.0)
+  call: assert(len(projection) == 16, "mat4 projection size")
+  call: assert(projection[0] > 1.29, "perspective x focal")
+  call: assert(projection[5] > 1.73, "perspective y focal")
+  call: assert(projection[11] == 0.0 - 1.0, "perspective homogeneous w")
+  set rotate: math3d.rotation_y(1.57079632679)
+  call: assert(rotate[0] < 0.0001, "quarter-turn cosine")
+  call: assert(rotate[0] > 0.0 - 0.0001, "quarter-turn cosine bound")
+  call: assert(rotate[8] > 0.999, "quarter-turn sine")
+  set model: math3d.compose(math3d.translation(0.0, 0.0, 0.0 - 2.5), rotate)
+  set mvp: math3d.compose(projection, math3d.compose(view, model))
+  call: assert(len(mvp) == 16, "MVP chain")
+  set geometry GRAPHICS_CUBE_GEOMETRY: app.service("geometry")
+  set lighting GRAPHICS_LIGHTING: app.service("lighting")
+  call: assert(len(geometry.positions()) == 72, "24 xyz face vertices")
+  call: assert(len(geometry.uvs()) == 48, "24 vertex UV pairs")
+  call: assert(len(geometry.normals()) == 72, "24 vertex normals")
+  call: assert(len(geometry.indices()) == 36, "12 indexed triangles")
+  set direction: lighting.direction()
+  set levels: lighting.levels()
+  call: assert(len(direction) == 3, "light vector")
+  call: assert(levels[0] > 0.0, "ambient lighting component")
+  call: assert(levels[1] > 0.0, "diffuse lighting component")
+  call: assert(app.stop() == 1)
+  print: "PASS: pure OW 3D camera, rotation and perspective contracts"

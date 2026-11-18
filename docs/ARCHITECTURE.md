@@ -28,7 +28,7 @@ Shader, Mesh and Texture modules each require the Window service; all GPU handle
 
 `App.boot()` registers all modules, checks contracts and orders startup. `App.stop()` tears down in reverse order. Window creation is explicitly deferred until after boot; this keeps contract checking and non-GPU tests safe. OpenGL resources are released in `graphics.window.close`; opening a new window rebuilds them.
 
-The extension holds a scoped resource registry per interpreter and context, with separate maps for shader programs, vertex/index buffers and textures. The math module runs entirely in OW and is independent of the GPU. Destroyed/stale resource handles are rejected, and remaining GPU resources are released before the window is destroyed. The extension has **one window per OW interpreter**, enforces graphics operations on the creation thread, validates operation names and argument types, and refuses unsupported Vulkan calls. It does not pretend Vulkan is implemented.
+The extension holds a scoped resource registry per interpreter and context, with separate maps for shader programs, vertex/index buffers and textures. The math, camera, cube geometry, and directional lighting modules run entirely in OW and are independent of the GPU. A new per-vertex normal layout at attribute location 2 enables directional diffuse lighting. Destroyed/stale resource handles are rejected, and remaining GPU resources are released before the window is destroyed. The extension has **one window per OW interpreter**, enforces graphics operations on the creation thread, validates operation names and argument types, and refuses unsupported Vulkan calls. It does not pretend Vulkan is implemented.
 
 ## Roadmap
 
@@ -39,8 +39,9 @@ The extension holds a scoped resource registry per interpreter and context, with
 5. [x] Custom OW GLSL shaders, vec4 uniforms and non-indexed triangle meshes
 5a. [x] Indexed geometry with UV attributes, RGBA8 textures, sampler and mat4 uniforms
 6. [x] Mesa/Xvfb software OpenGL framebuffer and end-to-end OW integration tests (including textured quad)
+6a. [x] Perspective, look-at, cube geometry, indexed normals, configurable depth testing and lighting
 7. [ ] Vulkan backend (surface, swapchain, synchronization)
-8. [ ] PNG/JPEG decoding, camera/projection helpers, scene graph, batch drawing
+8. [ ] PNG/JPEG decoding, shadow maps, mouse camera control, scene graph, batch drawing
 9. [ ] Native C ABI / compiler-level FFI after ow-lang supports a stable general-purpose interface
 10. [ ] Windows/macOS physical GPU smoke tests and broader graphics-driver compatibility
 

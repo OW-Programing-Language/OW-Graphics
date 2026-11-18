@@ -1,0 +1,82 @@
+# Pure OW camera math; OpenGL is ONLY used by the renderer/shader.
+module Graphics.Camera: GRAPHICS_CAMERA
+  fn name() -> string:
+    return: "camera"
+  fn requires() -> array:
+    return: []
+  fn register() -> int:
+    return: 0
+  fn start() -> int:
+    return: 0
+  fn stop() -> int:
+    return: 0
+  fn reload() -> int:
+    return: 0
+  fn on_event(type string, payload int) -> int:
+    return: 0
+  # Eye position, oriented towards -Z with +Y as camera up.
+  fn view_from_position(x float, y float, z float) -> array:
+    return: [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0 - x, 0.0 - y, 0.0 - z, 1.0]
+
+  # General view matrix. The two Newton iterations are repeated 14 times
+  # because the current OW sqrt() builtin operates only on integers.
+  fn look_at(eyeX float, eyeY float, eyeZ float, targetX float, targetY float, targetZ float, upX float, upY float, upZ float) -> array:
+    set fx float: targetX - eyeX
+    set fy float: targetY - eyeY
+    set fz float: targetZ - eyeZ
+    set fSquared float: fx * fx + fy * fy + fz * fz
+    call: assert(fSquared > 0.00000001, "eye and target must be different")
+    set fLength float: fSquared
+    if: fLength < 1.0
+      set fLength: 1.0
+    set i int: 0
+    while: i < 20
+      set fLength: 0.5 * (fLength + fSquared / fLength)
+      set i: i + 1
+    set fx: fx / fLength
+    set fy: fy / fLength
+    set fz: fz / fLength
+
+    set sx float: fy * upZ - fz * upY
+    set sy float: fz * upX - fx * upZ
+    set sz float: fx * upY - fy * upX
+    set sSquared float: sx * sx + sy * sy + sz * sz
+    call: assert(sSquared > 0.00000001, "up must not be parallel to viewing direction")
+    set sLength float: sSquared
+    if: sLength < 1.0
+      set sLength: 1.0
+    set j int: 0
+    while: j < 20
+      set sLength: 0.5 * (sLength + sSquared / sLength)
+      set j: j + 1
+    set sx: sx / sLength
+    set sy: sy / sLength
+    set sz: sz / sLength
+    set ux float: sy * fz - sz * fy
+    set uy float: sz * fx - sx * fz
+    set uz float: sx * fy - sy * fx
+    set tx float: 0.0 - (sx * eyeX + sy * eyeY + sz * eyeZ)
+    set ty float: 0.0 - (ux * eyeX + uy * eyeY + uz * eyeZ)
+    set tz float: fx * eyeX + fy * eyeY + fz * eyeZ
+    return: [sx, ux, 0.0 - fx, 0.0, sy, uy, 0.0 - fy, 0.0, sz, uz, 0.0 - fz, 0.0, tx, ty, tz, 1.0]
+
+  # fovY in radians, supported range 0.3..2.4 (~17..137 degrees).
+  # Small Taylor series gives accurate focal length for this half-angle range.
+  fn perspective(fovY float, aspect float, near float, far float) -> array:
+    call: assert(fovY >= 0.3, "field of view too small")
+    call: assert(fovY <= 2.4, "field of view too large")
+    call: assert(aspect > 0.0, "aspect ratio must be positive")
+    call: assert(near > 0.0, "near clipping plane must be positive")
+    call: assert(far > near, "far plane must exceed near plane")
+    set x float: fovY / 2.0
+    set x2 float: x * x
+    set x4 float: x2 * x2
+    set x6 float: x4 * x2
+    set x8 float: x4 * x4
+    set sine float: x - x * x2 / 6.0 + x * x4 / 120.0 - x * x6 / 5040.0 + x * x8 / 362880.0
+    set cosine float: 1.0 - x2 / 2.0 + x4 / 24.0 - x6 / 720.0 + x8 / 40320.0
+    set focal float: cosine / sine
+    set depth float: far - near
+    set zz float: 0.0 - (far + near) / depth
+    set zw float: 0.0 - 2.0 * far * near / depth
+    return: [focal / aspect, 0.0, 0.0, 0.0, 0.0, focal, 0.0, 0.0, 0.0, 0.0, zz, 0.0 - 1.0, 0.0, 0.0, zw, 0.0]

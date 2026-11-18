@@ -17,5 +17,7 @@ module Graphics.OpenGLMesh: GRAPHICS_MESH
     return: extension("graphics.mesh.create", positions)
   fn create_indexed(positions array, uvs array, indices array) -> int:
     return: extension("graphics.mesh.create_indexed", positions, uvs, indices)
+  fn create_lit_indexed(positions array, uvs array, normals array, indices array) -> int:
+    return: extension("graphics.mesh.create_lit_indexed", positions, uvs, normals, indices)
   fn destroy(handle int) -> int:
     return: extension("graphics.mesh.destroy", handle)

@@ -1,0 +1,6 @@
+# Right-handed OpenGL 3D camera module; column-major view/projection arrays.
+module_type GRAPHICS_CAMERA:
+  include NATIVE_LIFECYCLE
+  fn view_from_position(x float, y float, z float) -> array
+  fn look_at(eyeX float, eyeY float, eyeZ float, targetX float, targetY float, targetZ float, upX float, upY float, upZ float) -> array
+  fn perspective(fovY float, aspect float, near float, far float) -> array

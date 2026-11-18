@@ -1,0 +1,5 @@
+# Lighting parameters are independent from the OpenGL renderer and shaders.
+module_type GRAPHICS_LIGHTING:
+  include NATIVE_LIFECYCLE
+  fn direction() -> array
+  fn levels() -> array

@@ -6,3 +6,4 @@ module_type GRAPHICS_TRANSFORM:
   fn translation(x float, y float, z float) -> array
   fn scaling(x float, y float, z float) -> array
   fn compose(a array, b array) -> array
+  fn rotation_y(angle float) -> array
