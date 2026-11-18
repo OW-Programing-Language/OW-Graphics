@@ -83,6 +83,20 @@ public final class GltfModelParserTest {
                 src.replace("\"meshes\"","\"extensionsRequired\":[\"KHR_fake\"],\"meshes\"")));
     }
 
+    @Test public void rejectsNanVertexAttributeInsideEmbeddedBinary() {
+        String original = fixture();
+        String prefix = "data:application/octet-stream;base64,";
+        int start = original.indexOf(prefix) + prefix.length();
+        int finish = original.indexOf('"', start);
+        if (start < prefix.length() || finish < 0)
+            throw new AssertionError("test fixture URI missing");
+        byte[] bytes = Base64.getDecoder().decode(original.substring(start, finish));
+        ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).putFloat(0, Float.NaN);
+        String poisoned = original.substring(0, start)
+                + Base64.getEncoder().encodeToString(bytes) + original.substring(finish);
+        assertThrows(IllegalArgumentException.class, () -> GltfModelParser.parse(poisoned));
+    }
+
     @Test public void enforcesProjectSandbox() throws Exception {
         Path root=Files.createTempDirectory("ow-gltf");
         Path file=root.resolve("triangle.gltf");
