@@ -45,7 +45,9 @@ public final class DepthLightingGpuSmoke {
                     0.0,0.0,-1.020202,-1.0, 0.0,0.0,-0.2020202,0.0);
             check(op(graphics, "graphics.opengl.depth_test",1) == 1, "enable depth");
             check(glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST must be active");
-            check(glGetInteger(GL_DEPTH_BITS) >= 16, "OpenGL context must allocate depth buffer");
+            // GL_DEPTH_BITS is not guaranteed to be queryable in a core context.
+            // Depth correctness is verified below through actual occlusion and
+            // glReadPixels(GL_DEPTH_COMPONENT), not implementation-dependent state.
             op(graphics,"graphics.shader.bind",program);
             op(graphics,"graphics.shader.uniform_mat4",program,"uProjection",projection);
             op(graphics,"graphics.opengl.clear",0,0,0);
