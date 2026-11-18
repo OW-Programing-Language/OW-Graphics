@@ -20,6 +20,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
     private long window;
     private Thread owner;
     private boolean glfwInitialized;
+    private boolean contextReady;
     private int program;
     private int vertexArray;
     private int vertexBuffer;
@@ -127,6 +128,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
                 throw new IllegalStateException("Unable to create a GLFW OpenGL 3.3 window");
             glfwMakeContextCurrent(window);
             GL.createCapabilities();
+            contextReady = true;
             glfwSwapInterval(1);
             glfwShowWindow(window);
             return 1;
@@ -328,14 +330,17 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
 
     private void release() {
         if (window != 0L) {
-            resources.releaseAll();
-            if (program != 0) glDeleteProgram(program);
-            if (vertexBuffer != 0) glDeleteBuffers(vertexBuffer);
-            if (vertexArray != 0) glDeleteVertexArrays(vertexArray);
+            if (contextReady) {
+                resources.releaseAll();
+                if (program != 0) glDeleteProgram(program);
+                if (vertexBuffer != 0) glDeleteBuffers(vertexBuffer);
+                if (vertexArray != 0) glDeleteVertexArrays(vertexArray);
+                GL.setCapabilities(null);
+            }
             program = vertexBuffer = vertexArray = 0;
+            contextReady = false;
             glfwDestroyWindow(window);
             window = 0L;
-            GL.setCapabilities(null);
         }
         if (glfwInitialized) {
             glfwTerminate();
