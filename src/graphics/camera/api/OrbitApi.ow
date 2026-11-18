@@ -1,0 +1,6 @@
+# Orbit camera controller is pure OW and requires the typed GRAPHICS_CAMERA.
+# An application owns mutable yaw/pitch/distance, not a hidden global state.
+module_type GRAPHICS_ORBIT_CONTROLLER:
+  include NATIVE_LIFECYCLE
+  fn advance(yaw float, pitch float, distance float, dx float, dy float, scroll float) -> array
+  fn view(yaw float, pitch float, distance float) -> array

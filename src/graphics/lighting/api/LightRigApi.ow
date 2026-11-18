@@ -1,0 +1,9 @@
+# Three controllable sources: two directional lights and one point light.
+# Configurable shader uniforms are set in the scene composition root.
+module_type GRAPHICS_LIGHT_RIG:
+  include NATIVE_LIFECYCLE
+  fn key_direction() -> array
+  fn fill_direction() -> array
+  fn point_position() -> array
+  fn intensities() -> array
+  fn ambient() -> array

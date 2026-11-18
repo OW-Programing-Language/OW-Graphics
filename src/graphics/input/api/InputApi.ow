@@ -2,3 +2,6 @@
 module_type GRAPHICS_INPUT:
   include NATIVE_LIFECYCLE
   fn escape_pressed() -> int
+  fn key_down(key string) -> int
+  fn cursor_delta() -> array
+  fn scroll_delta() -> float
