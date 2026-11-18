@@ -83,3 +83,38 @@ The OpenGL bridge validates **before GPU upload**:
 `mvn -f native-bridge/pom.xml test` validates malformed inputs without a GPU. The Mesa/Xvfb CI tests four separate pixel colors of a real indexed textured quad **and** runs a complete OW+flOW native smoke application. Physical GPU and other-OS tests are still required.
 
 **Not implemented:** PNG/JPEG file reading, mipmaps, GPU-managed texture arrays, perspective cameras, lighting, Vulkan, arbitrary native LLVM output, or a full scene graph.
+
+## 5. Phase 4 — true 3D, camera, depth and lighting
+
+Try the [3D cube application](../examples/rotating_cube/main.ow). It runs the same OW `MakeMeshScene(Renderer)` scene functor with additional independent flOW services: `Camera`, `Transforms`, `CubeGeometry` and `Daylight`.
+
+```sh
+ow deps install
+ow check examples/rotating_cube/main.ow
+ow run tests/headless_3d.ow
+# Linux/macOS, after building native-bridge as above:
+java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/ow-graphics-native-0.1.0-SNAPSHOT.jar:native-bridge/target/lib/*" dev.oreo.Main run examples/rotating_cube/main.ow
+```
+
+### Coordinate convention and modules
+
+- Right-handed world, +Y up, camera views toward -Z by default.
+- `camera.look_at(eyeX,eyeY,eyeZ,targetX,targetY,targetZ,upX,upY,upZ)` creates a normalized view matrix. Eye and target must differ; up cannot be parallel to view.
+- `camera.perspective(fovY,aspect,near,far)`: radians, field of view between 0.3 and 2.4, positive aspect and near, far greater than near.
+- `transforms.rotation_y(angle)`: angle in radians between -π and π, using an explicit stable finite Taylor approximation because OW does not yet include floating-point trigonometric builtins. The example wraps rotation each frame.
+- `transforms.compose(a,b)` multiplies OpenGL column-major 4×4 matrices as `a*b`, applying `b` before `a`.
+- `renderer.depth_test(1)` turns on a depth buffer with `GL_LESS`; `depth_test(0)` turns it off. Depth is disabled by default so all earlier 2D demos remain unchanged. `renderer.clear` clears the color and depth buffers.
+- `meshes.create_lit_indexed(xyz,uv,normals,indices)` uploads separate XYZ normals to GLSL attribute location 2; the previous 5-float indexed geometry layout remains supported.
+- `geometry.positions/uvs/normals/indices` return 24 vertices and 36 indices for a unit cube with flat face normals. `lighting.direction()` and `lighting.levels()` are independent, swappable OW service values.
+- Lighting is simple ambient + Lambert diffuse per face. Nonuniform scaling requires inverse-transpose normal matrices (not yet supported); the demo uses rotation only.
+
+### Automated validation
+
+- `tests/headless_3d.ow` verifies the camera, view/project matrices, Y rotation, geometry and daylight modules without any JVM OpenGL plugin.
+- `Graphics3DArgumentsTest` verifies rejected bad/zero normals and invalid depth toggles.
+- `DepthLightingGpuSmoke` exercises real OpenGL depth occlusion and an actual normal-based light/dark difference using Mesa/Xvfb framebuffer reads.
+- `examples/rotating_cube/smoke.ow` exercises a complete OW→flOW→GLFW→OpenGL lit cube draw and resource cleanup; it exits after one frame for CI.
+
+A system with compatible OpenGL 3.3 drivers is still needed to validate actual interactive rendering and performance on Windows/macOS/physical GPU hardware.
+
+**Not implemented:** mouse-orbit controller, point lights, materials/PBR, shadow mapping, scene graph/occlusion culling, skeletal animation, or Vulkan.
