@@ -39,6 +39,3 @@ functor MakeKeyframeAnimation(T: GRAPHICS_TRANSFORM) -> GRAPHICS_KEYFRAME_ANIMAT
         return: [start[0] + (finish[0] - start[0]) * alpha, start[1] + (finish[1] - start[1]) * alpha, start[2] + (finish[2] - start[2]) * alpha]
       set k: k + 1
     return: positions[last]
-  fn model_matrix(times array, positions array, time float) -> array:
-    set point: this.translation(times, positions, time)
-    return: T.translation(point[0], point[1], point[2])

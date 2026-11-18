@@ -3,4 +3,3 @@
 module_type GRAPHICS_KEYFRAME_ANIMATION:
   include NATIVE_LIFECYCLE
   fn translation(times array, positions array, time float) -> array
-  fn model_matrix(times array, positions array, time float) -> array
