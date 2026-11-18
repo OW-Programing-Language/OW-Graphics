@@ -17,6 +17,8 @@ module Graphics.GlfwInput: GRAPHICS_INPUT
     return: extension("graphics.input.escape")
   fn key_down(key string) -> int:
     return: extension("graphics.input.key_down", key)
+  fn mouse_button_down(button string) -> int:
+    return: extension("graphics.input.mouse_button_down", button)
   fn cursor_delta() -> array:
     return: extension("graphics.input.cursor_delta")
   fn scroll_delta() -> float:

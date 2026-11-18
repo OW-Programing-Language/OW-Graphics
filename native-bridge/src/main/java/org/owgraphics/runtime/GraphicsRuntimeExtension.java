@@ -46,6 +46,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
                  "graphics.texture.create_rgba8", "graphics.texture.bind",
                  "graphics.texture.destroy", "graphics.input.key_down",
                  "graphics.input.cursor_delta", "graphics.input.scroll_delta",
+                 "graphics.input.mouse_button_down",
                  "graphics.model.parse_obj", "graphics.model.load_obj" -> true;
             default -> false;
         };
@@ -65,6 +66,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.input.escape" -> escapePressed(args);
             case "graphics.input.key_down" -> keyDown(args);
             case "graphics.input.cursor_delta" -> cursorDelta(args);
+            case "graphics.input.mouse_button_down" -> mouseButtonDown(args);
             case "graphics.input.scroll_delta" -> scrollDelta(args);
             case "graphics.model.parse_obj" -> parseObj(args);
             case "graphics.model.load_obj" -> loadObj(args);
@@ -218,6 +220,19 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
         };
         ensureOwner();
         return glfwGetKey(window, key) == GLFW_PRESS ? 1 : 0;
+    }
+
+    private int mouseButtonDown(List<Object> args) {
+        count(args, 1);
+        String name = GraphicsArguments.string(args.get(0), "mouse button");
+        int button = switch (name) {
+            case "LEFT" -> GLFW_MOUSE_BUTTON_LEFT;
+            case "RIGHT" -> GLFW_MOUSE_BUTTON_RIGHT;
+            case "MIDDLE" -> GLFW_MOUSE_BUTTON_MIDDLE;
+            default -> throw new IllegalArgumentException("Unsupported mouse button: " + name);
+        };
+        ensureOwner();
+        return glfwGetMouseButton(window, button) == GLFW_PRESS ? 1 : 0;
     }
 
     private List<Double> cursorDelta(List<Object> args) {
