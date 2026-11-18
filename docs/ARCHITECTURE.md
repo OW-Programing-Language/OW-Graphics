@@ -7,7 +7,7 @@ The project is a **modular monorepo**, not a set of copy-pasted framework files.
 - `dependencies.yml` pins **one external OW source library**: flOW v2. `ow deps install` resolves it to `.ow/deps/flow`; `@flow/src/App.ow` is a real OW dependency import.
 - `src/graphics/*/api` contains public module signatures extending flOW's `NATIVE_LIFECYCLE`.
 - `src/graphics/*/infra` contains implementations, not imported by consumer code. The composition root chooses implementations.
-- `scene/infra/MakeTriangleScene.ow` is a **native OW functor**, parameterized by the public renderer contract. OpenGL can be swapped out without changing the scene.
+- `scene/infra/MakeTriangleScene.ow` and `MakeMeshScene.ow` are **native OW functors**, parameterized by the public renderer contract. OpenGL can be swapped out without changing the scene.
 - `native-bridge/` is a separate JVM adapter implementing OW's `RuntimeExtension` SPI, using LWJGL to call **real GLFW/OpenGL native libraries**. OW code never manipulates native pointers.
 - `tests/headless_flow.ow` uses an actual headless renderer module. It boots with flOW, including dependency ordering and typed service retrieval, without GLFW or a GPU.
 
@@ -18,15 +18,20 @@ The project is a **modular monorepo**, not a set of copy-pasted framework files.
                  ^
                  |
           [Renderer: OpenGL] <-- [Scene: functor(Renderer)]
+                 ^
+                 | 
+          [Mesh] [Shader]
+            \     /
+              Window
 ```
 
-The headless module has no window dependency. Only one renderer with service name `renderer` should be registered per application. flOW blocks stopping a provider while dependents are active.
+Shader and Mesh modules each require the Window service; all GPU handles are opaque and validated within the runtime adapter. The headless counterparts have no window dependency. Only one renderer with service name `renderer` should be registered per application. flOW blocks stopping a provider while dependents are active.
 
 ## Lifecycle
 
 `App.boot()` registers all modules, checks contracts and orders startup. `App.stop()` tears down in reverse order. Window creation is explicitly deferred until after boot; this keeps contract checking and non-GPU tests safe. OpenGL resources are released in `graphics.window.close`; opening a new window rebuilds them.
 
-The extension has **one window per OW interpreter**, enforces graphics operations on the creation thread, validates operation names and argument types, and refuses unsupported Vulkan calls. It does not pretend Vulkan is implemented.
+The extension holds a scoped resource registry per interpreter and context. Destroyed/stale resource handles are rejected, and remaining GPU resources are released before the window is destroyed. The extension has **one window per OW interpreter**, enforces graphics operations on the creation thread, validates operation names and argument types, and refuses unsupported Vulkan calls. It does not pretend Vulkan is implemented.
 
 ## Roadmap
 
@@ -35,7 +40,8 @@ The extension has **one window per OW interpreter**, enforces graphics operation
 3. [x] GPU-free headless contract + lifecycle smoke test
 4. [x] JVM native extension with GLFW and OpenGL 3.3 triangle
 5. [ ] Vulkan backend (separate adapter, surface/swapchain, synchronization)
-6. [ ] Textures, shaders, pipelines, camera / matrices, scene graph, batch drawing
+6. [x] Phase 1: OW-provided GLSL shaders, uniform vec4 and non-indexed vertex meshes
+10. [ ] Textures, indexed meshes, camera / matrices, scene graph, batch drawing
 7. [ ] Native C ABI / compiler-level FFI when ow-lang supports a stable general-purpose FFI
 8. [x] Dependency lockfile pinned to the resolved flOW Git commit
 9. [ ] Linux/Windows/macOS GPU smoke tests (CI remains headless)

@@ -9,6 +9,10 @@ public final class GraphicsRuntimeExtensionTest {
         var provider = new GraphicsRuntimeExtension();
         assertTrue(provider.supports("graphics.window.open"));
         assertTrue(provider.supports("graphics.opengl.triangle"));
+        assertTrue(provider.supports("graphics.shader.create"));
+        assertTrue(provider.supports("graphics.shader.uniform4"));
+        assertTrue(provider.supports("graphics.mesh.draw"));
+        assertTrue(provider.supports("graphics.window.request_close"));
         assertFalse(provider.supports("graphics.vulkan.draw"));
         assertFalse(provider.supports("night.security.enable"));
     }
@@ -25,6 +29,21 @@ public final class GraphicsRuntimeExtensionTest {
                 () -> provider.invoke("graphics.window.open", List.of(0, 480, "test", "opengl")));
         assertThrows(UnsupportedOperationException.class,
                 () -> provider.invoke("graphics.window.open", List.of(640, 480, "test", "vulkan")));
+    }
+
+    @Test public void shaderAndMeshValidationRunsWithoutGpu() {
+        var provider = new GraphicsRuntimeExtension();
+        assertThrows(IllegalArgumentException.class,
+                () -> provider.invoke("graphics.shader.create", List.of(" ", "valid")));
+        assertThrows(IllegalArgumentException.class,
+                () -> provider.invoke("graphics.mesh.create", List.of(List.of(1, 2, 3))));
+        assertThrows(IllegalStateException.class,
+                () -> provider.invoke("graphics.shader.create", List.of("vertex", "fragment")));
+        assertThrows(IllegalStateException.class,
+                () -> provider.invoke("graphics.mesh.create", List.of(
+                        List.of(0, 0, 0, 1, 0, 0, 0, 1, 0))));
+        assertThrows(IllegalStateException.class,
+                () -> provider.invoke("graphics.window.request_close", List.of()));
     }
 
     @Test public void argumentArityAndValuesAreValidated() {

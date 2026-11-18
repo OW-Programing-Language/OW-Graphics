@@ -35,5 +35,8 @@ jobs:
           java -jar ../ow-lang/target/OwIDE.jar check tests/headless_flow.ow
           java -jar ../ow-lang/target/OwIDE.jar run tests/headless_flow.ow
           java -jar ../ow-lang/target/OwIDE.jar check src/main.ow
+          java -jar ../ow-lang/target/OwIDE.jar check tests/headless_resources.ow
+          java -jar ../ow-lang/target/OwIDE.jar run tests/headless_resources.ow
+          java -jar ../ow-lang/target/OwIDE.jar check examples/programmable_triangle/main.ow
       - name: Compile and test native SPI bridge (no GPU)
         run: mvn -B -q -f ow-graphics/native-bridge/pom.xml test
