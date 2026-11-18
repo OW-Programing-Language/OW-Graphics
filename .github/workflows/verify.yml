@@ -71,3 +71,6 @@ jobs:
           xvfb-run -a -s "-screen 0 800x600x24" env LIBGL_ALWAYS_SOFTWARE=1 \
             java -cp "ow-lang/target/OwIDE.jar:ow-graphics/native-bridge/target/test-classes:ow-graphics/native-bridge/target/classes:ow-graphics/native-bridge/target/lib/*" \
             dev.oreo.Main run ow-graphics/examples/rotating_cube/smoke.ow
+          xvfb-run -a -s "-screen 0 800x600x24" env LIBGL_ALWAYS_SOFTWARE=1 \
+            java -cp "ow-lang/target/OwIDE.jar:ow-graphics/native-bridge/target/test-classes:ow-graphics/native-bridge/target/classes:ow-graphics/native-bridge/target/lib/*" \
+            org.owgraphics.runtime.DepthLightingGpuSmoke
