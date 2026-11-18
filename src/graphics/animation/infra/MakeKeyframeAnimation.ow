@@ -1,0 +1,44 @@
+# Pure OW keyframe controller composable with the typed transform module.
+# This is NOT skinning or glTF animation-channel import.
+functor MakeKeyframeAnimation(T: GRAPHICS_TRANSFORM) -> GRAPHICS_KEYFRAME_ANIMATION:
+  fn name() -> string:
+    return: "animation"
+  fn requires() -> array:
+    return: ["transforms"]
+  fn register() -> int:
+    return: 0
+  fn start() -> int:
+    return: 0
+  fn stop() -> int:
+    return: 0
+  fn reload() -> int:
+    return: 0
+  fn on_event(type string, payload int) -> int:
+    return: 0
+  fn translation(times array, positions array, time float) -> array:
+    call: assert(len(times) > 0, "animation needs keyframes")
+    call: assert(len(times) == len(positions), "keyframe times/positions mismatch")
+    call: assert(len(times) <= 1024, "maximum 1024 animation keyframes")
+    set i int: 0
+    while: i < len(times)
+      call: assert(len(positions[i]) == 3, "each translation must have xyz")
+      if: i > 0
+        call: assert(times[i] > times[i - 1], "keyframe times must increase")
+      set i: i + 1
+    if: time <= times[0]
+      return: positions[0]
+    set last int: len(times) - 1
+    if: time >= times[last]
+      return: positions[last]
+    set k int: 1
+    while: k < len(times)
+      if: time < times[k]
+        set alpha float: (time - times[k - 1]) / (times[k] - times[k - 1])
+        set start: positions[k - 1]
+        set finish: positions[k]
+        return: [start[0] + (finish[0] - start[0]) * alpha, start[1] + (finish[1] - start[1]) * alpha, start[2] + (finish[2] - start[2]) * alpha]
+      set k: k + 1
+    return: positions[last]
+  fn model_matrix(times array, positions array, time float) -> array:
+    set point: this.translation(times, positions, time)
+    return: T.translation(point[0], point[1], point[2])

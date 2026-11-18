@@ -1,0 +1,6 @@
+# Direct-light GGX / metallic-roughness material parameters.
+# Full glTF PBR (IBL, textured maps) is intentionally out of scope.
+module_type GRAPHICS_PBR_MATERIAL:
+  include NATIVE_LIFECYCLE
+  fn base_color(name string) -> array
+  fn factors(name string) -> array
