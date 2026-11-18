@@ -1,0 +1,24 @@
+# A deliberately small contract fake. GPU resource lifetime is tested in Java.
+module Graphics.HeadlessMesh: GRAPHICS_MESH
+  fn name() -> string:
+    return: "mesh"
+  fn requires() -> array:
+    return: []
+  fn register() -> int:
+    return: 0
+  fn start() -> int:
+    return: 0
+  fn stop() -> int:
+    return: 0
+  fn reload() -> int:
+    return: 0
+  fn on_event(type string, payload int) -> int:
+    return: 0
+  fn create(positions array) -> int:
+    if: len(positions) < 9
+      return: 0
+    return: 1
+  fn destroy(handle int) -> int:
+    if: handle < 1
+      return: 0
+    return: 1

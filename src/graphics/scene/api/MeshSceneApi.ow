@@ -1,0 +1,4 @@
+# Programmable rendering scene: consume an opaque mesh ID, not GPU internals.
+module_type GRAPHICS_MESH_SCENE:
+  include NATIVE_LIFECYCLE
+  fn render_frame(mesh int) -> int
