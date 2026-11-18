@@ -1,0 +1,22 @@
+# Runs with ONLY ow-lang + flOW, no display or native graphics libraries.
+import "@flow/src/App.ow"
+import "../src/graphics/renderer/api/RendererApi.ow"
+import "../src/graphics/renderer/headless/HeadlessRenderer.ow"
+import "../src/graphics/scene/api/SceneApi.ow"
+import "../src/graphics/scene/infra/MakeTriangleScene.ow"
+
+main:
+  set scene GRAPHICS_SCENE: MakeTriangleScene(Graphics.HeadlessRenderer)
+  set app: new App()
+  # Scene is deliberately registered first to verify dependency ordering.
+  call: app.use_native_as(scene, "GRAPHICS_SCENE")
+  call: app.use_native_as(Graphics.HeadlessRenderer, "GRAPHICS_RENDERER")
+  call: assert(app.boot() == 1, "dependency-aware boot")
+  set renderer GRAPHICS_RENDERER: app.service("renderer")
+  set activeScene GRAPHICS_SCENE: app.service("scene")
+  call: assert(renderer.backend() == "headless", "backend selection")
+  call: assert(renderer.clear(256, 0, 0) == 0, "validate channels")
+  call: assert(activeScene.render_frame() == 1, "render a deterministic frame")
+  call: assert(app.disable("renderer") == 0, "cannot stop required renderer")
+  call: assert(app.stop() == 1, "clean shutdown")
+  print: "PASS: OW Graphics + flOW headless lifecycle and contracts"

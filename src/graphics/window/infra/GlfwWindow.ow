@@ -1,0 +1,26 @@
+# OW-facing window adapter. Never exposes native pointers.
+module Graphics.GlfwWindow: GRAPHICS_WINDOW
+  fn name() -> string:
+    return: "window"
+  fn requires() -> array:
+    return: []
+  fn register() -> int:
+    return: 0
+  fn start() -> int:
+    return: 0
+  fn stop() -> int:
+    return: extension("graphics.window.close")
+  fn reload() -> int:
+    return: 0
+  fn on_event(type string, payload int) -> int:
+    return: 0
+  fn open(width int, height int, title string) -> int:
+    return: extension("graphics.window.open", width, height, title, "opengl")
+  fn poll() -> int:
+    return: extension("graphics.window.poll")
+  fn present() -> int:
+    return: extension("graphics.window.present")
+  fn should_close() -> int:
+    return: extension("graphics.window.should_close")
+  fn close_window() -> int:
+    return: extension("graphics.window.close")

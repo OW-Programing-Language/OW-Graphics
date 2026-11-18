@@ -1,0 +1,20 @@
+# Typed flOW/OW functor: renderer implementation can be replaced.
+functor MakeTriangleScene(Draw: GRAPHICS_RENDERER) -> GRAPHICS_SCENE:
+  fn name() -> string:
+    return: "scene"
+  fn requires() -> array:
+    return: ["renderer"]
+  fn register() -> int:
+    return: 0
+  fn start() -> int:
+    return: 0
+  fn stop() -> int:
+    return: 0
+  fn reload() -> int:
+    return: 0
+  fn on_event(type string, payload int) -> int:
+    return: 0
+  fn render_frame() -> int:
+    if: Draw.clear(17, 24, 39) == 0
+      return: 0
+    return: Draw.draw_triangle()

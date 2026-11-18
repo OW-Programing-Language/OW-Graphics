@@ -1,0 +1,34 @@
+# Deterministic no-GPU backend for contract and lifecycle tests.
+module Graphics.HeadlessRenderer: GRAPHICS_RENDERER
+  fn name() -> string:
+    return: "renderer"
+  fn requires() -> array:
+    return: []
+  fn register() -> int:
+    return: 0
+  fn start() -> int:
+    return: 0
+  fn stop() -> int:
+    return: 0
+  fn reload() -> int:
+    return: 0
+  fn on_event(type string, payload int) -> int:
+    return: 0
+  fn backend() -> string:
+    return: "headless"
+  fn clear(red int, green int, blue int) -> int:
+    if: red < 0
+      return: 0
+    if: red > 255
+      return: 0
+    if: green < 0
+      return: 0
+    if: green > 255
+      return: 0
+    if: blue < 0
+      return: 0
+    if: blue > 255
+      return: 0
+    return: 1
+  fn draw_triangle() -> int:
+    return: 1

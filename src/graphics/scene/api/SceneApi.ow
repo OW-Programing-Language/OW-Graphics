@@ -1,0 +1,4 @@
+# Scene owns orchestration, not the underlying GPU API.
+module_type GRAPHICS_SCENE:
+  include NATIVE_LIFECYCLE
+  fn render_frame() -> int

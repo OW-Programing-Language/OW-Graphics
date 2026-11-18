@@ -1,0 +1,8 @@
+# Public contract: GLFW stays private to the runtime provider.
+module_type GRAPHICS_WINDOW:
+  include NATIVE_LIFECYCLE
+  fn open(width int, height int, title string) -> int
+  fn poll() -> int
+  fn present() -> int
+  fn should_close() -> int
+  fn close_window() -> int

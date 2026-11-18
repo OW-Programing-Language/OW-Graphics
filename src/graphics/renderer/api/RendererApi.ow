@@ -1,0 +1,6 @@
+# Rendering contract; a scene knows nothing about OpenGL or GLFW.
+module_type GRAPHICS_RENDERER:
+  include NATIVE_LIFECYCLE
+  fn backend() -> string
+  fn clear(red int, green int, blue int) -> int
+  fn draw_triangle() -> int

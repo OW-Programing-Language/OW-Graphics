@@ -1,0 +1,22 @@
+# OpenGL 3.3 implementation through OW's Java RuntimeExtension SPI.
+module Graphics.OpenGLRenderer: GRAPHICS_RENDERER
+  fn name() -> string:
+    return: "renderer"
+  fn requires() -> array:
+    return: ["window"]
+  fn register() -> int:
+    return: 0
+  fn start() -> int:
+    return: 0
+  fn stop() -> int:
+    return: 0
+  fn reload() -> int:
+    return: 0
+  fn on_event(type string, payload int) -> int:
+    return: 0
+  fn backend() -> string:
+    return: "opengl"
+  fn clear(red int, green int, blue int) -> int:
+    return: extension("graphics.opengl.clear", red, green, blue)
+  fn draw_triangle() -> int:
+    return: extension("graphics.opengl.triangle")

@@ -1,0 +1,37 @@
+name: Verify OW Graphics
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+
+jobs:
+  headless:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ow-graphics
+      - uses: actions/checkout@v4
+        with:
+          repository: OW-Programing-Language/ow-lang
+          ref: main
+          path: ow-lang
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: |
+            ow-lang/pom.xml
+            ow-graphics/native-bridge/pom.xml
+      - name: Install OW runtime artifact
+        run: mvn -B -q -f ow-lang/pom.xml -DskipTests install
+      - name: Resolve pinned flOW source and verify OW contracts
+        working-directory: ow-graphics
+        run: |
+          java -jar ../ow-lang/target/OwIDE.jar deps install
+          java -jar ../ow-lang/target/OwIDE.jar check tests/headless_flow.ow
+          java -jar ../ow-lang/target/OwIDE.jar run tests/headless_flow.ow
+          java -jar ../ow-lang/target/OwIDE.jar check src/main.ow
+      - name: Compile and test native SPI bridge (no GPU)
+        run: mvn -B -q -f ow-graphics/native-bridge/pom.xml test

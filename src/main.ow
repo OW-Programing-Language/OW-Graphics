@@ -1,0 +1,35 @@
+# OpenGL demo. Requires the Java runtime extension in native-bridge/.
+# Imports are deliberately assembled in this composition root only.
+import "@flow/src/App.ow"
+import "graphics/window/api/WindowApi.ow"
+import "graphics/window/infra/GlfwWindow.ow"
+import "graphics/renderer/api/RendererApi.ow"
+import "graphics/renderer/opengl/OpenGLRenderer.ow"
+import "graphics/input/api/InputApi.ow"
+import "graphics/input/infra/GlfwInput.ow"
+import "graphics/scene/api/SceneApi.ow"
+import "graphics/scene/infra/MakeTriangleScene.ow"
+
+main:
+  # Runtime ensures topological startup, even though modules register in reverse.
+  set scene GRAPHICS_SCENE: MakeTriangleScene(Graphics.OpenGLRenderer)
+  set app: new App()
+  call: app.use_native_as(scene, "GRAPHICS_SCENE")
+  call: app.use_native_as(Graphics.GlfwInput, "GRAPHICS_INPUT")
+  call: app.use_native_as(Graphics.OpenGLRenderer, "GRAPHICS_RENDERER")
+  call: app.use_native_as(Graphics.GlfwWindow, "GRAPHICS_WINDOW")
+  call: assert(app.boot() == 1, "graphics module boot")
+
+  set window GRAPHICS_WINDOW: app.service("window")
+  set input GRAPHICS_INPUT: app.service("input")
+  set renderer GRAPHICS_RENDERER: app.service("renderer")
+  call: assert(renderer.backend() == "opengl", "selected rendering backend")
+  call: assert(window.open(960, 540, "OW Graphics / OpenGL") == 1, "create window")
+  while: window.should_close() == 0
+    call: window.poll()
+    if: input.escape_pressed() == 1
+      call: window.close_window()
+    else:
+      call: scene.render_frame()
+      call: window.present()
+  call: app.stop()
