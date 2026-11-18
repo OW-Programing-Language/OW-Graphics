@@ -1,0 +1,49 @@
+# Phase 7: PBR params, keyframe interpolation, and instancing contracts.
+import "@flow/src/App.ow"
+import "../src/graphics/math/api/TransformApi.ow"
+import "../src/graphics/math/infra/Transforms.ow"
+import "../src/graphics/animation/api/AnimationApi.ow"
+import "../src/graphics/animation/infra/MakeKeyframeAnimation.ow"
+import "../src/graphics/material/api/PbrApi.ow"
+import "../src/graphics/material/infra/MetallicRoughness.ow"
+import "../src/graphics/mesh/api/MeshApi.ow"
+import "../src/graphics/mesh/headless/HeadlessMesh.ow"
+
+main:
+  set animation GRAPHICS_KEYFRAME_ANIMATION: MakeKeyframeAnimation(Graphics.Transforms)
+  set app: new App()
+  call: app.use_native_as(animation, "GRAPHICS_KEYFRAME_ANIMATION")
+  call: app.use_native_as(Graphics.MetallicRoughness, "GRAPHICS_PBR_MATERIAL")
+  call: app.use_native_as(Graphics.HeadlessMesh, "GRAPHICS_MESH")
+  call: app.use_native_as(Graphics.Transforms, "GRAPHICS_TRANSFORM")
+  call: assert(app.boot() == 1, "flOW phase 7 service boot")
+  set anim GRAPHICS_KEYFRAME_ANIMATION: app.service("animation")
+  set pbr GRAPHICS_PBR_MATERIAL: app.service("pbr")
+  set mesh GRAPHICS_MESH: app.service("mesh")
+  set t GRAPHICS_TRANSFORM: app.service("transforms")
+  set times: [0.0, 1.0, 2.0]
+  set positions: [[0.0, 0.0, 0.0], [0.0, 2.0, 0.0], [0.0, 0.0, 0.0]]
+  set before: anim.translation(times, positions, 0.0 - 1.0)
+  set mid: anim.translation(times, positions, 0.5)
+  set late: anim.translation(times, positions, 1.5)
+  set after: anim.translation(times, positions, 6.0)
+  call: assert(before[1] == 0.0, "animation begins at first key")
+  call: assert(mid[1] == 1.0, "linear interpolation up")
+  call: assert(late[1] == 1.0, "linear interpolation down")
+  call: assert(after[1] == 0.0, "animation clamps at last key")
+  set mat: t.translation(mid[0], mid[1], mid[2])
+  call: assert(mat[13] == 1.0, "animated model Y")
+  set gold: pbr.factors("gold")
+  set ceramic: pbr.factors("ceramic")
+  call: assert(gold[0] == 1.0, "gold is metallic")
+  call: assert(ceramic[0] == 0.0, "ceramic is dielectric")
+  call: assert(ceramic[1] > gold[1], "ceramic roughness greater")
+  call: assert(len(pbr.base_color("plastic")) == 4)
+  set id int: mesh.create_indexed([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 1.0, 0.0, 0.0, 1.0], [0, 1, 2])
+  call: assert(id > 0)
+  call: assert(mesh.draw_instanced(id, [t.identity(), mat]) == 1, "two headless instances")
+  call: assert(mesh.draw_instanced(id, []) == 0, "no zero-instance draws")
+  call: assert(mesh.destroy(id) == 1)
+  call: assert(app.disable("transforms") == 0, "functor requires transforms")
+  call: assert(app.stop() == 1)
+  print: "PASS: flOW metallic/roughness, keyframe interpolation and instance contract"
