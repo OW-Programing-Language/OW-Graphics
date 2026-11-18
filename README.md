@@ -55,7 +55,7 @@ The GUI opens a window and draws a shader-based triangle, using OpenGL 3.3. Pres
 | Vulkan backend | Planned; not yet implemented |
 | Advanced shaders, textures and meshes API | Planned |
 | Native OW AOT/FFI integration | Awaiting compiler support |
-| Lockfile | Generate and commit after first `ow deps install` |
+| Lockfile | Committed and SHA-pinned |
 
 See [architecture](docs/ARCHITECTURE.md) and [development commands](docs/DEVELOPMENT.md).
 

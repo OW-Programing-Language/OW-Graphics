@@ -37,7 +37,7 @@ The extension has **one window per OW interpreter**, enforces graphics operation
 5. [ ] Vulkan backend (separate adapter, surface/swapchain, synchronization)
 6. [ ] Textures, shaders, pipelines, camera / matrices, scene graph, batch drawing
 7. [ ] Native C ABI / compiler-level FFI when ow-lang supports a stable general-purpose FFI
-8. [ ] Dependency lockfile committed after resolving via `ow deps install`
+8. [x] Dependency lockfile pinned to the resolved flOW Git commit
 9. [ ] Linux/Windows/macOS GPU smoke tests (CI remains headless)
 
 `ow build` is **not** a supported way to compile the full demo to a stand-alone native executable yet: OW's LLVM backend supports only a limited static module subset and does not lower the SPI/plugin calls. Use `ow run` with the extension JAR on the JVM classpath.

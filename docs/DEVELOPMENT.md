@@ -13,7 +13,7 @@ ow run tests/headless_flow.ow
 ow check src/main.ow
 ```
 
-The manifest pins flOW by a real commit SHA. The first `ow deps install` generates `dependencies.lock.yml`. **Commit that file** after resolution; do not commit `.ow/deps/`. The lockfile cannot be created or verified offline solely from the GitHub manifest.
+The manifest pins flOW by a real commit SHA. `dependencies.lock.yml` is committed and pins the exact checked-out flOW revision. `ow deps install` validates and uses this lock; do not commit `.ow/deps/`.
 
 ## 2. Java / LWJGL runtime provider
 

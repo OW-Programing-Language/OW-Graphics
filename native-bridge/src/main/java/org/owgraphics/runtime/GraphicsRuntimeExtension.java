@@ -158,10 +158,6 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
         if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255)
             throw new IllegalArgumentException("RGB channels must be in 0..255");
         ensureOwner();
-        int[] viewport = new int[4];
-        org.lwjgl.opengl.GL11.glGetIntegerv(org.lwjgl.opengl.GL11.GL_VIEWPORT, viewport);
-        int[] framebufferWidth = new int[1];
-        int[] framebufferHeight = new int[1];
         try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
             var w = stack.mallocInt(1);
             var h = stack.mallocInt(1);

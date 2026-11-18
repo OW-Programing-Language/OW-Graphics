@@ -30,6 +30,7 @@ jobs:
         working-directory: ow-graphics
         run: |
           java -jar ../ow-lang/target/OwIDE.jar deps install
+          git diff --exit-code -- dependencies.lock.yml
           java -jar ../ow-lang/target/OwIDE.jar check tests/headless_flow.ow
           java -jar ../ow-lang/target/OwIDE.jar run tests/headless_flow.ow
           java -jar ../ow-lang/target/OwIDE.jar check src/main.ow
