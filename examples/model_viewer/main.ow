@@ -1,0 +1,129 @@
+# Wavefront OBJ model viewer: orbit mouse camera, 2 directional + 1 point light.
+# Run from OW-Graphics root, with native-bridge on the JVM classpath.
+import "@flow/src/App.ow"
+import "../../src/graphics/window/api/WindowApi.ow"
+import "../../src/graphics/window/infra/GlfwWindow.ow"
+import "../../src/graphics/input/api/InputApi.ow"
+import "../../src/graphics/input/infra/GlfwInput.ow"
+import "../../src/graphics/renderer/api/RendererApi.ow"
+import "../../src/graphics/renderer/opengl/OpenGLRenderer.ow"
+import "../../src/graphics/shader/api/ShaderApi.ow"
+import "../../src/graphics/shader/opengl/OpenGLShader.ow"
+import "../../src/graphics/mesh/api/MeshApi.ow"
+import "../../src/graphics/mesh/opengl/OpenGLMesh.ow"
+import "../../src/graphics/texture/api/TextureApi.ow"
+import "../../src/graphics/texture/opengl/OpenGLTexture.ow"
+import "../../src/graphics/math/api/TransformApi.ow"
+import "../../src/graphics/math/infra/Transforms.ow"
+import "../../src/graphics/camera/api/CameraApi.ow"
+import "../../src/graphics/camera/infra/Camera.ow"
+import "../../src/graphics/camera/api/OrbitApi.ow"
+import "../../src/graphics/camera/infra/MakeOrbitController.ow"
+import "../../src/graphics/model/api/ModelApi.ow"
+import "../../src/graphics/model/infra/ObjModel.ow"
+import "../../src/graphics/lighting/api/LightRigApi.ow"
+import "../../src/graphics/lighting/infra/StudioLights.ow"
+import "../../src/graphics/scene/api/MeshSceneApi.ow"
+import "../../src/graphics/scene/infra/MakeMeshScene.ow"
+
+main:
+  set scene GRAPHICS_MESH_SCENE: MakeMeshScene(Graphics.OpenGLRenderer)
+  set orbit GRAPHICS_ORBIT_CONTROLLER: MakeOrbitController(Graphics.Camera)
+  set app: new App()
+  call: app.use_native_as(scene, "GRAPHICS_MESH_SCENE")
+  call: app.use_native_as(orbit, "GRAPHICS_ORBIT_CONTROLLER")
+  call: app.use_native_as(Graphics.StudioLights, "GRAPHICS_LIGHT_RIG")
+  call: app.use_native_as(Graphics.ObjModel, "GRAPHICS_MODEL")
+  call: app.use_native_as(Graphics.Camera, "GRAPHICS_CAMERA")
+  call: app.use_native_as(Graphics.Transforms, "GRAPHICS_TRANSFORM")
+  call: app.use_native_as(Graphics.OpenGLTexture, "GRAPHICS_TEXTURE")
+  call: app.use_native_as(Graphics.OpenGLMesh, "GRAPHICS_MESH")
+  call: app.use_native_as(Graphics.OpenGLShader, "GRAPHICS_SHADER")
+  call: app.use_native_as(Graphics.GlfwInput, "GRAPHICS_INPUT")
+  call: app.use_native_as(Graphics.OpenGLRenderer, "GRAPHICS_RENDERER")
+  call: app.use_native_as(Graphics.GlfwWindow, "GRAPHICS_WINDOW")
+  call: assert(app.boot() == 1, "flOW model viewer boot")
+
+  set window GRAPHICS_WINDOW: app.service("window")
+  set input GRAPHICS_INPUT: app.service("input")
+  set renderer GRAPHICS_RENDERER: app.service("renderer")
+  set shader GRAPHICS_SHADER: app.service("shader")
+  set mesh GRAPHICS_MESH: app.service("mesh")
+  set textures GRAPHICS_TEXTURE: app.service("texture")
+  set camera GRAPHICS_CAMERA: app.service("camera")
+  set controls GRAPHICS_ORBIT_CONTROLLER: app.service("orbit")
+  set transforms GRAPHICS_TRANSFORM: app.service("transforms")
+  set importer GRAPHICS_MODEL: app.service("model")
+  set lighting GRAPHICS_LIGHT_RIG: app.service("light_rig")
+  set liveScene GRAPHICS_MESH_SCENE: app.service("scene")
+  call: assert(window.open(640, 480, "OW Graphics / OBJ Model Viewer") == 1)
+  call: assert(renderer.depth_test(1) == 1, "3D depth enabled")
+
+  set obj: importer.load_obj("examples/model_viewer/assets/pyramid.obj")
+  set meshId int: mesh.create_lit_indexed(obj[0], obj[1], obj[2], obj[3])
+  set textureId int: textures.create_rgba8(2, 2, [220, 170, 120, 255, 250, 226, 190, 255, 170, 195, 245, 255, 230, 240, 250, 255])
+  set vertexSource: "#version 330 core\nlayout(location=0) in vec3 aPos;\nlayout(location=1) in vec2 aUv;\nlayout(location=2) in vec3 aNormal;\nout vec2 vUv;\nout vec3 vNormal;\nout vec3 vWorldPos;\nuniform mat4 uModel;\nuniform mat4 uView;\nuniform mat4 uProjection;\nvoid main(){vec4 world=uModel*vec4(aPos,1.0);vWorldPos=world.xyz;vUv=aUv;vNormal=mat3(uModel)*aNormal;gl_Position=uProjection*uView*world;}"
+  set fragmentSource: "#version 330 core\nin vec2 vUv;\nin vec3 vNormal;\nin vec3 vWorldPos;\nout vec4 pixel;\nuniform sampler2D uTexture;\nuniform vec4 uKeyDir;\nuniform vec4 uFillDir;\nuniform vec4 uPoint;\nuniform vec4 uStrengths;\nuniform vec4 uAmbient;\nvoid main(){vec3 n=normalize(vNormal);vec3 toPoint=uPoint.xyz-vWorldPos;float atten=1.0/(1.0+0.12*dot(toPoint,toPoint));float key=max(dot(n,normalize(uKeyDir.xyz)),0.0)*uStrengths.x;float fill=max(dot(n,normalize(uFillDir.xyz)),0.0)*uStrengths.y;float point=max(dot(n,normalize(toPoint)),0.0)*uStrengths.z*atten;vec3 light=uAmbient.rgb+key*vec3(1.0,0.92,0.80)+fill*vec3(0.45,0.65,1.0)+point*vec3(1.0,0.70,0.40);pixel=vec4(texture(uTexture,vUv).rgb*light,1.0);}"
+  set shaderId int: shader.create(vertexSource, fragmentSource)
+  call: assert(shaderId > 0, "compile multi-light GLSL")
+  call: assert(meshId > 0, "upload OBJ model")
+  call: assert(textureId > 0, "upload RGBA8 palette")
+  call: assert(shader.bind(shaderId) == 1)
+
+  set projection: camera.perspective(1.0471975512, 1.333333333333, 0.1, 50.0)
+  set model: transforms.rotation_y(0.0)
+  call: assert(shader.set_mat4(shaderId, "uProjection", projection) == 1)
+  call: assert(shader.set_mat4(shaderId, "uModel", model) == 1)
+  call: assert(shader.set_int(shaderId, "uTexture", 0) == 1)
+  set keyLight: lighting.key_direction()
+  set fillLight: lighting.fill_direction()
+  set pointLight: lighting.point_position()
+  set levels: lighting.intensities()
+  set ambient: lighting.ambient()
+  call: assert(shader.set_vec4(shaderId, "uKeyDir", keyLight[0], keyLight[1], keyLight[2], 0.0) == 1)
+  call: assert(shader.set_vec4(shaderId, "uFillDir", fillLight[0], fillLight[1], fillLight[2], 0.0) == 1)
+  call: assert(shader.set_vec4(shaderId, "uPoint", pointLight[0], pointLight[1], pointLight[2], 1.0) == 1)
+  call: assert(shader.set_vec4(shaderId, "uStrengths", levels[0], levels[1], levels[2], 0.0) == 1)
+  call: assert(shader.set_vec4(shaderId, "uAmbient", ambient[0], ambient[1], ambient[2], 0.0) == 1)
+  call: assert(textures.bind(textureId, 0) == 1)
+
+  set yaw float: 0.45
+  set pitch float: 0.28
+  set distance float: 3.8
+
+  # Drag with left mouse button, use scroll to zoom, arrow keys to orbit.
+  while: window.should_close() == 0
+    call: window.poll()
+    if: input.escape_pressed() == 1
+      call: window.request_close()
+    else:
+      set delta: input.cursor_delta()
+      set scroll float: input.scroll_delta()
+      set moveX float: 0.0
+      set moveY float: 0.0
+      if: input.mouse_button_down("LEFT") == 1
+        set moveX: delta[0]
+        set moveY: delta[1]
+      if: input.key_down("LEFT") == 1
+        set moveX: moveX - 4.0
+      if: input.key_down("RIGHT") == 1
+        set moveX: moveX + 4.0
+      if: input.key_down("UP") == 1
+        set moveY: moveY - 4.0
+      if: input.key_down("DOWN") == 1
+        set moveY: moveY + 4.0
+      set state: controls.advance(yaw, pitch, distance, moveX, moveY, scroll)
+      set yaw: state[0]
+      set pitch: state[1]
+      set distance: state[2]
+      set view: controls.view(yaw, pitch, distance)
+      call: shader.bind(shaderId)
+      call: shader.set_mat4(shaderId, "uView", view)
+      call: textures.bind(textureId, 0)
+      call: liveScene.render_frame(meshId)
+      call: window.present()
+
+  call: textures.destroy(textureId)
+  call: mesh.destroy(meshId)
+  call: shader.destroy(shaderId)
+  call: app.stop()
