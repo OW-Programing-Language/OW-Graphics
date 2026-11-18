@@ -156,3 +156,36 @@ set meshId int: meshes.create_lit_indexed(geometry[0], geometry[1], geometry[2],
 CI checks `tests/headless_orbit.ow`, CPU-only OBJ validation (including path sandboxing), native GLFW input polling, a multi-light framebuffer test, actual `tests/obj_loader.ow`, and a one-frame `examples/model_viewer/smoke.ow` under Mesa/Xvfb.
 
 **Limitations:** basic fixed camera/orbit controls, no gamepad input, no mouse capture/fps controller, no variable-rate key controls, no OBJ material library/texture file loading, no native OW AOT or Vulkan backend.
+
+## 7. Phase 6 — materials, PNG/JPEG and hierarchical multi-object scenes
+
+[The material scene example](../examples/material_scene/main.ow) loads a real original checkerboard PNG, plus the pyramid OBJ from Phase 5. Both objects use the **same GPU mesh and texture handle**, but distinct material presets and model matrices. A parent transform controls the child model, and the application clears the framebuffer once per frame with `MakeMultiScene(Renderer)`.
+
+```sh
+ow deps install
+ow run tests/headless_material_scene.ow
+ow run tests/headless_multiscene.ow
+ow check examples/material_scene/main.ow
+# In repository root, build the native bridge and install OW compiler as above
+java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/ow-graphics-native-0.1.0-SNAPSHOT.jar:native-bridge/target/lib/*" dev.oreo.Main run examples/material_scene/main.ow
+```
+
+The renderer draws two OBJ instances with different copper/azure tints and ambient/diffuse/specular/shininess material values in the shader. The original `GRAPHICS_MESH_SCENE` remains unchanged for all older demos.
+
+### PNG/JPEG safety and API
+
+The `GRAPHICS_TEXTURE` contract now includes `load_image(relativePath)`. Supported local formats: PNG (`.png`) and JPEG (`.jpg`, `.jpeg`) through JDK ImageIO; the file contents must match the extension. Files must reside below the **process working directory**, with absolute paths, parent traversal and escaping symlinks rejected. Compressed file size is limited to 8 MiB and image dimensions to 2048×2048.
+
+Images are decoded on CPU and converted to bottom-row-first RGBA8 for OpenGL; PNG alpha is preserved and JPEG is fully opaque. The resulting GPU texture uses the existing nearest/clamp-to-edge policy. A headless texture module returns 0 for this GPU-only file load, rather than claiming image decoding without an adapter.
+
+### Graph and material contracts
+
+`MakeSceneGraph(Graphics.Transforms)` creates a `GRAPHICS_SCENE_GRAPH` service. `resolve(parents, localMatrices)` expects parent-first nodes; a parent index of `-1` means root, and any other parent must have a smaller index. It returns a list of column-major world matrices, with a maximum of 1024 nodes. The application owns node mesh/material mappings and binds uniforms before each `draw_object(meshHandle)`.
+
+`GRAPHICS_MATERIAL_LIBRARY` exposes `tint(name)` as an RGBA vector and `properties(name)` as `[ambient, diffuse, specular, shininess]`. Example names: `copper`, `azure`, `stone`. These are **Phong-style shader parameters**, not parsed OBJ/MTL material definitions, and users can replace the library module through flOW.
+
+### Tests
+
+The build verifies OW contracts and parent-child transform composition without GPU, decoder safety and both PNG/JPEG via CPU unit tests, and Mesa framebuffer pixels for **two separately tinted textured objects**, plus an end-to-end OW→flOW→OpenGL two-object example. See [Materials & Scenes](MATERIALS-AND-SCENES.md).
+
+**Not implemented:** MTL material files, glTF, gamma-aware image pipelines, PBR maps, batching/instanced draws, scene animations, shadows, or a Vulkan backend.

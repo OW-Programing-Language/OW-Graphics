@@ -24,11 +24,19 @@ Arrows mean "depends on". The window must be registered as a provider before dep
 
 Shader, Mesh and Texture modules each require the Window service; all GPU handles are opaque and validated within the runtime adapter. The headless counterparts have no window dependency. Only one renderer with service name `renderer` should be registered per application. flOW blocks stopping a provider while dependents are active.
 
+## Phase 6 module boundaries
+
+The native `ImageAssetLoader` decodes local PNG/JPEG images into bottom-up RGBA8 arrays, then `OpenGlResources` uploads and owns their OpenGL texture handles. A maximum 8 MiB compressed file and 2048×2048 decoded image are enforced before allocation, and the working-directory sandbox prevents path traversal and symlink escape.
+
+`MakeSceneGraph(Transforms)` is a typed **pure OW functor**. It resolves parent-first local matrices into world matrices with at most 1024 nodes, and rejects non-root backward/cyclic references. The scene graph stores no mesh, shader or texture handles: those remain exclusively application-owned resources. `MakeMultiScene(Renderer)` provides one frame clear and many independent mesh draws so materials can be bound between objects.
+
+The `StudioMaterials` library is a pure OW service returning per-object RGBA tint and ambient/diffuse/specular/shininess parameters. The application passes these values to GLSL; OW Graphics deliberately does not claim MTL or full PBR material support.
+
 ## Lifecycle
 
 `App.boot()` registers all modules, checks contracts and orders startup. `App.stop()` tears down in reverse order. Window creation is explicitly deferred until after boot; this keeps contract checking and non-GPU tests safe. OpenGL resources are released in `graphics.window.close`; opening a new window rebuilds them.
 
-The extension holds a scoped resource registry per interpreter and context, with separate maps for shader programs, vertex/index buffers and textures. The math, camera, orbit controller, cube geometry, and lighting preset modules run entirely in OW and are independent of the GPU. A new per-vertex normal layout at attribute location 2 enables directional diffuse lighting. Destroyed/stale resource handles are rejected, and remaining GPU resources are released before the window is destroyed. The extension has **one window per OW interpreter**, enforces graphics operations on the creation thread, validates operation names and argument types, and refuses unsupported Vulkan calls. It does not pretend Vulkan is implemented.
+The extension holds a scoped resource registry per interpreter and context, with separate maps for shader programs, vertex/index buffers and textures. The math, camera, orbit controller, cube geometry, material library, scene graph and lighting preset modules run entirely in OW and are independent of the GPU. A new per-vertex normal layout at attribute location 2 enables directional diffuse lighting. Destroyed/stale resource handles are rejected, and remaining GPU resources are released before the window is destroyed. The extension has **one window per OW interpreter**, enforces graphics operations on the creation thread, validates operation names and argument types, and refuses unsupported Vulkan calls. It does not pretend Vulkan is implemented.
 
 ## Roadmap
 
@@ -42,7 +50,8 @@ The extension holds a scoped resource registry per interpreter and context, with
 6a. [x] Perspective, look-at, cube geometry, indexed normals, configurable depth testing and lighting
 7. [ ] Vulkan backend (surface, swapchain, synchronization)
 7a. [x] Phase 5: native GLFW cursor and named inputs, pure OW orbit controller functor, two directional + point lights, sandboxed Wavefront OBJ import
-8. [ ] PNG/JPEG/MTL decoding, shadow maps, scene graph, batch drawing, GPU instancing
+7b. [x] Phase 6: bounded PNG/JPEG loader, typed material library, scene graph and multi-object renderer
+8. [ ] MTL/PBR materials, shadow maps, batched instancing, animation and GPU scene culling
 9. [ ] Native C ABI / compiler-level FFI after ow-lang supports a stable general-purpose interface
 10. [ ] Windows/macOS physical GPU smoke tests and broader graphics-driver compatibility
 
