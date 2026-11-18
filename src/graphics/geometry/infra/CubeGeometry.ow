@@ -1,0 +1,29 @@
+# Unit-sized cube with 24 vertices (4 per face) and 36 indices.
+# Duplicating edge vertices gives each face its own flat normal and UVs.
+# Front is +Z; indexing uses counter-clockwise triangles.
+module Graphics.CubeGeometry: GRAPHICS_CUBE_GEOMETRY
+  fn name() -> string:
+    return: "geometry"
+  fn requires() -> array:
+    return: []
+  fn register() -> int:
+    return: 0
+  fn start() -> int:
+    return: 0
+  fn stop() -> int:
+    return: 0
+  fn reload() -> int:
+    return: 0
+  fn on_event(type string, payload int) -> int:
+    return: 0
+  fn positions() -> array:
+    set n float: 0.0 - 0.5
+    set p float: 0.5
+    return: [n, n, p, p, n, p, p, p, p, n, p, p, p, n, n, n, n, n, n, p, n, p, p, n, p, n, p, p, n, n, p, p, n, p, p, p, n, n, n, n, n, p, n, p, p, n, p, n, n, p, p, p, p, p, p, p, n, n, p, n, n, n, n, p, n, n, p, n, p, n, n, p]
+  fn uvs() -> array:
+    return: [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0]
+  fn normals() -> array:
+    set negOne float: 0.0 - 1.0
+    return: [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, negOne, 0.0, 0.0, negOne, 0.0, 0.0, negOne, 0.0, 0.0, negOne, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, negOne, 0.0, 0.0, negOne, 0.0, 0.0, negOne, 0.0, 0.0, negOne, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, negOne, 0.0, 0.0, negOne, 0.0, 0.0, negOne, 0.0, 0.0, negOne, 0.0]
+  fn indices() -> array:
+    return: [0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4, 8, 9, 10, 10, 11, 8, 12, 13, 14, 14, 15, 12, 16, 17, 18, 18, 19, 16, 20, 21, 22, 22, 23, 20]
