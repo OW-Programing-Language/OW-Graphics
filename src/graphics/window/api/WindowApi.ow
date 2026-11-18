@@ -5,4 +5,5 @@ module_type GRAPHICS_WINDOW:
   fn poll() -> int
   fn present() -> int
   fn should_close() -> int
+  fn request_close() -> int
   fn close_window() -> int

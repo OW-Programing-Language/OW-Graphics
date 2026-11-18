@@ -20,3 +20,5 @@ module Graphics.OpenGLRenderer: GRAPHICS_RENDERER
     return: extension("graphics.opengl.clear", red, green, blue)
   fn draw_triangle() -> int:
     return: extension("graphics.opengl.triangle")
+  fn draw_mesh(mesh int) -> int:
+    return: extension("graphics.mesh.draw", mesh)

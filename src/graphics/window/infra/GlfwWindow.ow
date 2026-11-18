@@ -22,5 +22,7 @@ module Graphics.GlfwWindow: GRAPHICS_WINDOW
     return: extension("graphics.window.present")
   fn should_close() -> int:
     return: extension("graphics.window.should_close")
+  fn request_close() -> int:
+    return: extension("graphics.window.request_close")
   fn close_window() -> int:
     return: extension("graphics.window.close")
