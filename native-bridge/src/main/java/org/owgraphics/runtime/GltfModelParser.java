@@ -95,13 +95,16 @@ final class GltfModelParser {
                             int components, int componentType) {
         double value(int row, int col) {
             int position = offset + row * stride + col * componentBytes(componentType);
-            return switch (componentType) {
+            double value = switch (componentType) {
                 case 5126 -> bytes.getFloat(position);
                 case 5125 -> Integer.toUnsignedLong(bytes.getInt(position));
                 case 5123 -> Short.toUnsignedInt(bytes.getShort(position));
                 case 5121 -> Byte.toUnsignedInt(bytes.get(position));
                 default -> throw new IllegalArgumentException("Unsupported accessor component type");
             };
+            if (!Double.isFinite(value) || Math.abs(value) > Float.MAX_VALUE)
+                throw new IllegalArgumentException("glTF accessor contains a non-finite value");
+            return value;
         }
     }
 
