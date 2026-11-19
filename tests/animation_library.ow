@@ -1,0 +1,42 @@
+# Phase 10 CPU/OW flOW integration: clip library, CUBICSPLINE, blend and clock.
+import "@flow/src/App.ow"
+import "../src/graphics/animation/api/AnimationLibraryApi.ow"
+import "../src/graphics/animation/infra/GltfAnimationLibrary.ow"
+import "../src/graphics/animation/api/ClockApi.ow"
+import "../src/graphics/animation/infra/MonotonicClock.ow"
+import "../src/graphics/animation/api/GltfSkinApi.ow"
+import "../src/graphics/animation/infra/GltfSkin.ow"
+
+main:
+  set app: new App()
+  call: app.use_native_as(Graphics.GltfAnimationLibrary, "GRAPHICS_ANIMATION_LIBRARY")
+  call: app.use_native_as(Graphics.MonotonicClock, "GRAPHICS_ANIMATION_CLOCK")
+  call: app.use_native_as(Graphics.GltfSkin, "GRAPHICS_GLTF_SKIN")
+  call: assert(app.boot() == 1, "phase 10 native flOW boot")
+  set library GRAPHICS_ANIMATION_LIBRARY: app.service("animation_library")
+  set clock GRAPHICS_ANIMATION_CLOCK: app.service("clock")
+  set skin GRAPHICS_GLTF_SKIN: app.service("gltf_skin")
+  set pack: library.load_library("examples/animation_library/assets/wave_bounce.glb")
+  call: assert(len(pack) == 4, "rig and all clip metadata")
+  call: assert(len(pack[0]) == 14, "Phase 9 rig compatible")
+  call: assert(len(pack[1]) == 2, "two animation clips")
+  call: assert(pack[2][0] == "Wave", "clip names available")
+  call: assert(pack[2][1] == "Bounce", "clip names available")
+  call: assert(library.clip_duration(pack, 1) == 1.0, "clip duration")
+  call: assert(library.loop_time(pack, 1, 2.25) == 0.25, "wrap by actual clip duration")
+  set first: library.sample_clip(pack, 0, 0.5)
+  set second: library.sample_clip(pack, 1, 0.5)
+  set mixed: library.blend_clips(pack, 0, 0.5, 1, 0.5, 0.5)
+  call: assert(len(first) == 2, "two joint matrices")
+  call: assert(first[1][13] > 0.274, "wave moves positive")
+  call: assert(second[1][13] < 0.0 - 0.349, "bounce Hermite moves negative")
+  call: assert(mixed[1][13] > 0.0 - 0.038, "crossfade local pose")
+  call: assert(mixed[1][13] < 0.0 - 0.037, "crossfade local pose")
+  call: assert(first[0][0] == 1.0, "root remains fixed")
+  set previous float: clock.now_seconds()
+  set current float: clock.now_seconds()
+  call: assert(current >= previous, "real monotonic clock")
+  set legacy: skin.load_rig("examples/gltf_skinning/assets/wave.glb")
+  call: assert(len(legacy) == 14, "old GPU rig API preserved")
+  call: assert(app.stop() == 1)
+  print: "PASS: OW/flOW multi-clip glTF, Hermite, crossfade and real clock"
