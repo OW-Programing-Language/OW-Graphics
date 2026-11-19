@@ -1,0 +1,58 @@
+# OW/flOW contract proof: pure OW state machine plus CPU additive/timeline services.
+import "@flow/src/App.ow"
+import "../src/graphics/animation/api/AnimationLibraryApi.ow"
+import "../src/graphics/animation/infra/GltfAnimationLibrary.ow"
+import "../src/graphics/animation/api/StateMachineApi.ow"
+import "../src/graphics/animation/infra/MakeAnimationStateMachine.ow"
+import "../src/graphics/animation/api/AnimationLayerApi.ow"
+import "../src/graphics/animation/infra/GltfAnimationLayer.ow"
+import "../src/graphics/animation/api/TimelineApi.ow"
+import "../src/graphics/animation/infra/GltfTimeline.ow"
+
+main:
+  set controller GRAPHICS_ANIMATION_STATE_MACHINE: MakeAnimationStateMachine(Graphics.GltfAnimationLibrary)
+  set app: new App()
+  call: app.use_native_as(controller, "GRAPHICS_ANIMATION_STATE_MACHINE")
+  call: app.use_native_as(Graphics.GltfAnimationLibrary, "GRAPHICS_ANIMATION_LIBRARY")
+  call: app.use_native_as(Graphics.GltfAnimationLayer, "GRAPHICS_ANIMATION_LAYER")
+  call: app.use_native_as(Graphics.GltfTimeline, "GRAPHICS_ANIMATION_TIMELINE")
+  call: assert(app.boot() == 1, "animation controller flOW boot")
+  set machine GRAPHICS_ANIMATION_STATE_MACHINE: app.service("animation_state_machine")
+  set animation GRAPHICS_ANIMATION_LIBRARY: app.service("animation_library")
+  set layer GRAPHICS_ANIMATION_LAYER: app.service("animation_layer")
+  set timeline GRAPHICS_ANIMATION_TIMELINE: app.service("animation_timeline")
+  set lib: animation.load_library("examples/animation_controller/assets/three_clips.glb")
+  call: assert(len(lib[1]) == 3, "three animation clips")
+  call: assert(lib[2][2] == "Walk", "root motion clip name")
+  set state: machine.initial(lib, 0)
+  call: assert(state[0] == 0, "initial state")
+  set state: machine.tick(lib, state, 1, 0.25, 1.0)
+  call: assert(state[0] == 1, "transition target Bounce")
+  call: assert(state[2] == 0, "source remains Wave")
+  call: assert(state[4] == 0.25, "transition alpha numerator")
+  set blended: machine.sample(lib, state)
+  call: assert(len(blended) == 2, "crossfade pose")
+  set state: machine.tick(lib, state, 2, 0.25, 1.0)
+  call: assert(state[0] == 1, "midfade new requests are deferred")
+  call: assert(state[4] == 0.5, "crossfade advances using elapsed time")
+  set state: machine.tick(lib, state, 1, 0.5, 1.0)
+  call: assert(state[2] == 0 - 1, "crossfade completed")
+  set state: machine.tick(lib, state, 2, 0.1, 0.0)
+  call: assert(state[0] == 2, "zero-duration state transition")
+  call: assert(state[2] == 0 - 1, "no zero-duration fade")
+  set walking: machine.sample(lib, state)
+  call: assert(walking[0][12] > 0.099, "walk moves root")
+  set mixed: layer.additive(lib, 0, 0.5, 1, 0.5, 0.0, 0.5, [1])
+  call: assert(mixed[1][13] > 0.099, "masked upper-body overlay")
+  call: assert(mixed[1][13] < 0.101, "masked upper-body overlay")
+  set source: animation.sample_clip(lib, 0, 0.5)
+  set unchanged: layer.additive(lib, 0, 0.5, 1, 0.5, 0.0, 1.0, [])
+  call: assert(unchanged[1][13] == source[1][13], "empty mask is a no-op")
+  set motion: timeline.root_delta(lib, 2, 0, 0.75, 1.25)
+  call: assert(motion[0] == 0.5, "cycle crossing root displacement")
+  set events: timeline.events_between(lib, 2, [[2, 0.25, "step-left"], [2, 0.75, "step-right"]], 0.8, 1.3)
+  call: assert(len(events) == 1, "one marker across wrap")
+  call: assert(events[0][0] == "step-left", "marker label")
+  call: assert(events[0][1] == 1.25, "absolute marker time")
+  call: assert(app.stop() == 1)
+  print: "PASS: pure OW state machine, masked additive pose, root delta and timeline markers"
