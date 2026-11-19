@@ -1,0 +1,113 @@
+# Phase 12: multiple independently animated actors share a single skinned GPU mesh.
+# Trigger rules, actor timelines, palette anchoring and root-motion world transforms
+# are implemented as pure OW functors; OpenGL only renders the resulting poses.
+import "@flow/src/App.ow"
+import "../../src/graphics/window/api/WindowApi.ow"
+import "../../src/graphics/window/infra/GlfwWindow.ow"
+import "../../src/graphics/input/api/InputApi.ow"
+import "../../src/graphics/input/infra/GlfwInput.ow"
+import "../../src/graphics/renderer/api/RendererApi.ow"
+import "../../src/graphics/renderer/opengl/OpenGLRenderer.ow"
+import "../../src/graphics/shader/api/ShaderApi.ow"
+import "../../src/graphics/shader/opengl/OpenGLShader.ow"
+import "../../src/graphics/mesh/api/MeshApi.ow"
+import "../../src/graphics/mesh/opengl/OpenGLMesh.ow"
+import "../../src/graphics/animation/api/AnimationLibraryApi.ow"
+import "../../src/graphics/animation/infra/GltfAnimationLibrary.ow"
+import "../../src/graphics/animation/api/ClockApi.ow"
+import "../../src/graphics/animation/infra/MonotonicClock.ow"
+import "../../src/graphics/animation/api/StateMachineApi.ow"
+import "../../src/graphics/animation/infra/MakeAnimationStateMachine.ow"
+import "../../src/graphics/animation/api/AnimationGraphApi.ow"
+import "../../src/graphics/animation/infra/MakeAnimationGraph.ow"
+import "../../src/graphics/animation/api/ActorCrowdApi.ow"
+import "../../src/graphics/animation/infra/MakeActorCrowd.ow"
+import "../../src/graphics/animation/api/TimelineApi.ow"
+import "../../src/graphics/animation/infra/GltfTimeline.ow"
+import "../../src/graphics/math/api/TransformApi.ow"
+import "../../src/graphics/math/infra/Transforms.ow"
+
+main:
+  set sm GRAPHICS_ANIMATION_STATE_MACHINE: MakeAnimationStateMachine(Graphics.GltfAnimationLibrary)
+  set graph GRAPHICS_ANIMATION_GRAPH: MakeAnimationGraph(sm)
+  set crowd GRAPHICS_ANIMATION_CROWD: MakeActorCrowd(graph, Graphics.GltfAnimationLibrary, Graphics.GltfTimeline, Graphics.Transforms)
+  set app: new App()
+  call: app.use_native_as(crowd, "GRAPHICS_ANIMATION_CROWD")
+  call: app.use_native_as(graph, "GRAPHICS_ANIMATION_GRAPH")
+  call: app.use_native_as(sm, "GRAPHICS_ANIMATION_STATE_MACHINE")
+  call: app.use_native_as(Graphics.GltfAnimationLibrary, "GRAPHICS_ANIMATION_LIBRARY")
+  call: app.use_native_as(Graphics.GltfTimeline, "GRAPHICS_ANIMATION_TIMELINE")
+  call: app.use_native_as(Graphics.Transforms, "GRAPHICS_TRANSFORM")
+  call: app.use_native_as(Graphics.MonotonicClock, "GRAPHICS_ANIMATION_CLOCK")
+  call: app.use_native_as(Graphics.OpenGLMesh, "GRAPHICS_MESH")
+  call: app.use_native_as(Graphics.OpenGLShader, "GRAPHICS_SHADER")
+  call: app.use_native_as(Graphics.GlfwInput, "GRAPHICS_INPUT")
+  call: app.use_native_as(Graphics.OpenGLRenderer, "GRAPHICS_RENDERER")
+  call: app.use_native_as(Graphics.GlfwWindow, "GRAPHICS_WINDOW")
+  call: assert(app.boot() == 1, "multiple actor graphics modules boot")
+
+  set window GRAPHICS_WINDOW: app.service("window")
+  set input GRAPHICS_INPUT: app.service("input")
+  set renderer GRAPHICS_RENDERER: app.service("renderer")
+  set shader GRAPHICS_SHADER: app.service("shader")
+  set mesh GRAPHICS_MESH: app.service("mesh")
+  set libraryApi GRAPHICS_ANIMATION_LIBRARY: app.service("animation_library")
+  set clock GRAPHICS_ANIMATION_CLOCK: app.service("clock")
+  set actors GRAPHICS_ANIMATION_CROWD: app.service("animation_crowd")
+  set library: libraryApi.load_library("examples/animation_controller/assets/three_clips.glb")
+  call: assert(len(library[1]) == 3, "three clip asset shared")
+  call: assert(window.open(640,480,"OW Graphics / Multi-Actor Animation") == 1)
+  set rig: library[0]
+  set meshId int: mesh.create_skinned_indexed(rig[0], rig[1], rig[2], rig[3], rig[4], rig[5])
+  set shaderId int: shader.create("#version 330 core\nlayout(location=0) in vec3 aPos;\nlayout(location=2) in vec3 aNormal;\nlayout(location=7) in vec4 aJoints;\nlayout(location=8) in vec4 aWeights;\nuniform mat4 uBones[32];\nuniform mat4 uModel;\nout vec3 vNormal;\nvoid main(){\n  vec4 local=vec4(aPos*0.35,1.0);\n  mat4 skin=aWeights.x*uBones[int(aJoints.x)]\n           +aWeights.y*uBones[int(aJoints.y)]\n           +aWeights.z*uBones[int(aJoints.z)]\n           +aWeights.w*uBones[int(aJoints.w)];\n  gl_Position=uModel*skin*local;\n  vNormal=mat3(uModel*skin)*aNormal;\n}", "#version 330 core\nin vec3 vNormal;\nout vec4 pixel;\nuniform vec4 uColor;\nvoid main() {\n  float n=max(dot(normalize(vNormal), normalize(vec3(0.3,0.5,1.0))),0.0);\n  pixel=vec4(uColor.rgb*(0.35+0.65*n),uColor.a);\n}")
+  call: assert(meshId > 0, "shared skinned geometry")
+  call: assert(shaderId > 0, "multi-actor GLSL program")
+  set rules: [[0,2,"walk",0.45], [2,0,"stop",0.4], [1,0,"stop",0.25], [0 - 1,1,"bounce",0.35]]
+  set crowdState: [actors.spawn(library,0,[0.0 - 0.72,0.0,0.0],0), actors.spawn(library,2,[0.0,0.0,0.0],0), actors.spawn(library,1,[0.72,0.0,0.0],0)]
+
+  # All actors advance at independent local times; one GPU mesh, three draws.
+  # Root motion is integrated only once into each actor's world translation.
+  set startTime float: clock.now_seconds()
+  set lastTick float: startTime
+  while: window.should_close() == 0
+    call: window.poll()
+    if: input.escape_pressed() == 1
+      call: window.request_close()
+    else:
+      set current float: clock.now_seconds()
+      set dt float: current - lastTick
+      set lastTick: current
+      if: dt > 0.1
+        set dt: 0.1
+      set elapsed float: current - startTime
+      set cycle float: libraryApi.loop_time(library, 2, elapsed / 12.0) * 12.0
+      set triggers: ["","",""]
+      if: cycle >= 2.0
+        set triggers: ["walk","",""]
+      if: cycle >= 5.0
+        set triggers: ["stop","stop","bounce"]
+      if: cycle >= 8.0
+        set triggers: ["bounce","walk","stop"]
+      set crowdState: actors.advance_all(library, crowdState, rules, triggers, dt)
+      call: shader.bind(shaderId)
+      call: renderer.clear(8,14,25)
+      set i int: 0
+      while: i < len(crowdState)
+        set actor: crowdState[i]
+        set model: actors.model(actor)
+        set palette: actors.palette(library, actor)
+        call: shader.set_mat4(shaderId, "uModel", model)
+        call: shader.set_mat4_array(shaderId, "uBones", palette)
+        if: i == 0
+          call: shader.set_vec4(shaderId, "uColor", 0.95, 0.3, 0.25, 1.0)
+        if: i == 1
+          call: shader.set_vec4(shaderId, "uColor", 0.25, 0.9, 0.38, 1.0)
+        if: i == 2
+          call: shader.set_vec4(shaderId, "uColor", 0.28, 0.52, 0.97, 1.0)
+        call: renderer.draw_mesh(meshId)
+        set i: i + 1
+      call: window.present()
+
+  call: assert(mesh.destroy(meshId) == 1, "shared mesh destroyed exactly once")
+  call: assert(shader.destroy(shaderId) == 1, "shared shader destroyed")
+  call: assert(app.stop() == 1, "flOW services stopped")
