@@ -28,11 +28,26 @@ public final class AnimationCrowdGpuSmoke {
                 return dir;
         throw new AssertionError("Phase 11 animated GLB asset missing");
     }
-    private static int[] pixel(int x,int y) {
-        ByteBuffer rgba=BufferUtils.createByteBuffer(4);
+    /** Region counts are robust to animated vertices changing exact pixel y. */
+    private static int coloredPixels(int xMin,int xMax,int dominantChannel) {
+        int width=xMax-xMin;
+        ByteBuffer pixels=BufferUtils.createByteBuffer(width*240*4);
         glReadBuffer(GL_BACK);
-        glReadPixels(x,y,1,1,GL_RGBA,GL_UNSIGNED_BYTE,rgba);
-        return new int[]{rgba.get(0)&255,rgba.get(1)&255,rgba.get(2)&255};
+        glReadPixels(xMin,0,width,240,GL_RGBA,GL_UNSIGNED_BYTE,pixels);
+        int colored=0;
+        for(int p=0;p<width*240;p++) {
+            int r=pixels.get(p*4)&255;
+            int g=pixels.get(p*4+1)&255;
+            int b=pixels.get(p*4+2)&255;
+            boolean match=switch(dominantChannel) {
+                case 0 -> r>200&&g<100&&b<100;
+                case 1 -> g>200&&r<100&&b<100;
+                case 2 -> b>200&&r<100&&g<120;
+                default -> throw new IllegalArgumentException("Unknown color channel");
+            };
+            if(match)colored++;
+        }
+        return colored;
     }
     private static List<Double> translation(double x) {
         return List.of(1.0,0.0,0.0,0.0,
@@ -82,13 +97,12 @@ public final class AnimationCrowdGpuSmoke {
             draw(gpu,shader,mesh,bounce,0.0,0.12,0.98,0.12);
             draw(gpu,shader,mesh,walk,0.7,0.12,0.28,0.98);
             glFinish();
-            int[] left=pixel(48,106),middle=pixel(160,106),right=pixel(272,106);
-            ensure(left[0]>200&&left[1]<80&&left[2]<80,
-                    "left actor must be red: "+java.util.Arrays.toString(left));
-            ensure(middle[1]>200&&middle[0]<80&&middle[2]<80,
-                    "middle actor must be green: "+java.util.Arrays.toString(middle));
-            ensure(right[2]>200&&right[0]<80&&right[1]<100,
-                    "right actor must be blue: "+java.util.Arrays.toString(right));
+            int left=coloredPixels(10,88,0);
+            int middle=coloredPixels(110,205,1);
+            int right=coloredPixels(235,315,2);
+            ensure(left>200,"left red actor visible in its own region: "+left);
+            ensure(middle>200,"middle green actor visible in its own region: "+middle);
+            ensure(right>200,"right blue actor visible in its own region: "+right);
             // Move ONLY the middle actor. The first and third model matrices
             // remain unchanged and must still occupy their original pixels.
             op(gpu,"graphics.opengl.clear",5,8,12);
@@ -96,14 +110,16 @@ public final class AnimationCrowdGpuSmoke {
             draw(gpu,shader,mesh,bounce,0.35,0.12,0.98,0.12);
             draw(gpu,shader,mesh,walk,0.7,0.12,0.28,0.98);
             glFinish();
-            int[] emptied=pixel(160,106),moved=pixel(216,106);
-            int[] leftAfter=pixel(48,106),rightAfter=pixel(272,106);
-            ensure(emptied[0]<30&&emptied[1]<30&&emptied[2]<30,
-                    "middle actor old pixel must be empty");
-            ensure(moved[1]>200&&moved[0]<80,
-                    "middle actor appears in updated world location");
-            ensure(leftAfter[0]>200&&rightAfter[2]>200,
-                    "independent actor positions remain unchanged");
+            int oldMiddleRegion=coloredPixels(105,170,1);
+            int newMiddleRegion=coloredPixels(193,233,1);
+            int leftAfter=coloredPixels(10,88,0);
+            int rightAfter=coloredPixels(255,315,2);
+            ensure(oldMiddleRegion==0,
+                    "moved actor must leave the old world region empty: "+oldMiddleRegion);
+            ensure(newMiddleRegion>150,
+                    "moved actor must occupy the new world region: "+newMiddleRegion);
+            ensure(leftAfter>200 && rightAfter>200,
+                    "other actors must remain in their independent world regions");
             ensure(glGetError()==GL_NO_ERROR,"no graphics errors");
             ensure(op(gpu,"graphics.mesh.destroy",mesh)==1,"shared mesh destroyed once");
             ensure(op(gpu,"graphics.shader.destroy",shader)==1,"shader destroyed");
