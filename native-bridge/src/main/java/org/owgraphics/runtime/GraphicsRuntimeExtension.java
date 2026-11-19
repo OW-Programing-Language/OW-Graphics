@@ -40,8 +40,10 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
                  "graphics.input.escape", "graphics.opengl.clear", "graphics.opengl.depth_test", "graphics.opengl.triangle",
                  "graphics.shader.create", "graphics.shader.bind",
                  "graphics.shader.uniform4", "graphics.shader.uniform_mat4",
-                 "graphics.shader.uniform_int", "graphics.shader.destroy",
+                 "graphics.shader.uniform_int", "graphics.shader.uniform_mat4_array",
+                 "graphics.shader.destroy",
                  "graphics.mesh.create", "graphics.mesh.create_indexed", "graphics.mesh.create_lit_indexed",
+                 "graphics.mesh.create_skinned_indexed",
                  "graphics.mesh.draw", "graphics.mesh.destroy",
                  "graphics.texture.create_rgba8", "graphics.texture.load_image", "graphics.texture.bind",
                  "graphics.texture.destroy", "graphics.input.key_down",
@@ -50,6 +52,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
                  "graphics.model.parse_obj", "graphics.model.load_obj",
                  "graphics.model.parse_gltf", "graphics.model.load_gltf",
                  "graphics.scene.parse_gltf", "graphics.scene.load_gltf",
+                 "graphics.skin.parse_gltf", "graphics.skin.load_gltf", "graphics.skin.sample",
                  "graphics.mesh.draw_instanced" -> true;
             default -> false;
         };
@@ -77,6 +80,9 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.model.load_gltf" -> loadGltf(args);
             case "graphics.scene.parse_gltf" -> parseSceneGltf(args);
             case "graphics.scene.load_gltf" -> loadSceneGltf(args);
+            case "graphics.skin.parse_gltf" -> parseSkinnedGltf(args);
+            case "graphics.skin.load_gltf" -> loadSkinnedGltf(args);
+            case "graphics.skin.sample" -> sampleSkinnedGltf(args);
             case "graphics.opengl.clear" -> clearFrame(args);
             case "graphics.opengl.depth_test" -> configureDepth(args);
             case "graphics.opengl.triangle" -> drawTriangle(args);
@@ -84,11 +90,13 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.shader.bind" -> bindShader(args);
             case "graphics.shader.uniform4" -> setShaderVec4(args);
             case "graphics.shader.uniform_mat4" -> setShaderMat4(args);
+            case "graphics.shader.uniform_mat4_array" -> setShaderMat4Array(args);
             case "graphics.shader.uniform_int" -> setShaderInt(args);
             case "graphics.shader.destroy" -> destroyShader(args);
             case "graphics.mesh.create" -> createMesh(args);
             case "graphics.mesh.create_indexed" -> createIndexedMesh(args);
             case "graphics.mesh.create_lit_indexed" -> createLitMesh(args);
+            case "graphics.mesh.create_skinned_indexed" -> createSkinnedMesh(args);
             case "graphics.mesh.draw" -> drawMesh(args);
             case "graphics.mesh.draw_instanced" -> drawInstanced(args);
             case "graphics.mesh.destroy" -> destroyMesh(args);
@@ -436,6 +444,15 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
         return resources.uniformMatrix4(handle, name, values);
     }
 
+    private int setShaderMat4Array(List<Object> args) {
+        count(args,3);
+        int handle=GraphicsArguments.integer(args.get(0),"shader handle");
+        String name=GraphicsArguments.string(args.get(1),"uniform array name");
+        float[] values=GraphicsArguments.jointMatrices(args.get(2));
+        ensureOwner();
+        return resources.uniformMatrix4Array(handle,name,values);
+    }
+
     private int setShaderInt(List<Object> args) {
         count(args, 3);
         int handle = GraphicsArguments.integer(args.get(0), "shader handle");
@@ -477,6 +494,37 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
         return GltfSceneParser.loadRelative(
                 GraphicsArguments.string(args.get(0), "scene filename"),
                 Path.of("").toAbsolutePath());
+    }
+
+    private List<Object> parseSkinnedGltf(List<Object> args) {
+        count(args,1);
+        return GltfSkinParser.parseJson(
+                GraphicsArguments.string(args.get(0),"animated glTF source"));
+    }
+
+    private List<Object> loadSkinnedGltf(List<Object> args) {
+        count(args,1);
+        return GltfSkinParser.loadRelative(
+                GraphicsArguments.string(args.get(0),"animated glTF filename"),
+                Path.of("").toAbsolutePath());
+    }
+
+    private List<Object> sampleSkinnedGltf(List<Object> args) {
+        count(args,2);
+        if(!(args.get(0) instanceof List<?> rig))
+            throw new IllegalArgumentException("Animated rig must be an array");
+        if(!(args.get(1) instanceof Number number))
+            throw new IllegalArgumentException("Animation time must be numeric");
+        double time=number.doubleValue();
+        return GltfSkinParser.sample(rig,time);
+    }
+
+    private int createSkinnedMesh(List<Object> args) {
+        count(args,6);
+        var mesh=GraphicsArguments.skinnedGeometry(
+                args.get(0),args.get(1),args.get(2),args.get(3),args.get(4),args.get(5));
+        ensureOwner();
+        return resources.createSkinnedMesh(mesh);
     }
 
     private int createMesh(List<Object> args) {
