@@ -111,6 +111,18 @@ final class OpenGlResources {
         return 1;
     }
 
+    int uniformMatrix4Array(int handle,String name,float[] flattened) {
+        if(name==null || name.isBlank() || name.length()>120
+                || flattened.length<16 || flattened.length>512 || flattened.length%16!=0)
+            throw new IllegalArgumentException("Joint uniform array must have 1..32 mat4 matrices");
+        int location=uniformLocation(handle,name+"[0]");
+        if(location<0)return 0;
+        FloatBuffer values=BufferUtils.createFloatBuffer(flattened.length);
+        values.put(flattened).flip();
+        glUniformMatrix4fv(location,false,values);
+        return 1;
+    }
+
     private int uniformLocation(int handle, String name) {
         if (name.isBlank() || name.length() > 128)
             throw new IllegalArgumentException("Uniform name must contain 1..128 characters");
@@ -167,12 +179,22 @@ final class OpenGlResources {
         return uploadIndexedMesh(lit.base(), lit.normals());
     }
 
+    int createSkinnedMesh(GraphicsArguments.SkinnedGeometry skin) {
+        return uploadIndexedMesh(skin.lit().base(),skin.lit().normals(),
+                skin.joints(),skin.weights());
+    }
+
     /**
      * Vertex layout: xyz at location 0, UV at 1, optional normal xyz at 2.
      * Each face of a box can have separate vertex normals while still sharing
      * corner positions only within that face. Existing 5-float meshes remain valid.
      */
     private int uploadIndexedMesh(GraphicsArguments.IndexedGeometry geometry, float[] normals) {
+        return uploadIndexedMesh(geometry,normals,null,null);
+    }
+
+    private int uploadIndexedMesh(GraphicsArguments.IndexedGeometry geometry,float[] normals,
+                                  float[] joints,float[] weights) {
         int vao = 0, vbo = 0, ebo = 0;
         boolean success = false;
         try {
@@ -186,7 +208,7 @@ final class OpenGlResources {
             float[] uv = geometry.uvs();
             int[] indices = geometry.indices();
             int vertexCount = positions.length / 3;
-            int stride = normals == null ? 5 : 8;
+            int stride = normals == null ? 5 : joints == null ? 8 : 16;
             FloatBuffer interleaved = BufferUtils.createFloatBuffer(vertexCount * stride);
             for (int i = 0; i < vertexCount; i++) {
                 interleaved.put(positions[i * 3]);
@@ -198,6 +220,10 @@ final class OpenGlResources {
                     interleaved.put(normals[i * 3]);
                     interleaved.put(normals[i * 3 + 1]);
                     interleaved.put(normals[i * 3 + 2]);
+                }
+                if(joints!=null) {
+                    for(int c=0;c<4;c++)interleaved.put(joints[i*4+c]);
+                    for(int c=0;c<4;c++)interleaved.put(weights[i*4+c]);
                 }
             }
             interleaved.flip();
@@ -213,6 +239,14 @@ final class OpenGlResources {
             if (normals != null) {
                 glVertexAttribPointer(2, 3, GL_FLOAT, false, stride * Float.BYTES, 5L * Float.BYTES);
                 glEnableVertexAttribArray(2);
+            }
+            if(joints!=null) {
+                // Attribute slots 3..6 are reserved for optional instance mat4.
+                // Slots 7/8 store four float joint IDs (integer-valued) and weights.
+                glVertexAttribPointer(7,4,GL_FLOAT,false,stride*Float.BYTES,8L*Float.BYTES);
+                glEnableVertexAttribArray(7);
+                glVertexAttribPointer(8,4,GL_FLOAT,false,stride*Float.BYTES,12L*Float.BYTES);
+                glEnableVertexAttribArray(8);
             }
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, elements, GL_STATIC_DRAW);
