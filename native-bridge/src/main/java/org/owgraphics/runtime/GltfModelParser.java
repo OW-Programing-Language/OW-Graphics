@@ -91,7 +91,7 @@ final class GltfModelParser {
         return number;
     }
 
-    private record Accessor(ByteBuffer bytes, int offset, int stride, int count,
+    record Accessor(ByteBuffer bytes, int offset, int stride, int count,
                             int components, int componentType) {
         double value(int row, int col) {
             int position = offset + row * stride + col * componentBytes(componentType);
@@ -123,7 +123,7 @@ final class GltfModelParser {
         return value;
     }
 
-    private static Accessor accessor(JsonObject root, ByteBuffer data, int index) {
+    static Accessor accessor(JsonObject root, ByteBuffer data, int index) {
         JsonArray accessors = array(root,"accessors");
         JsonObject spec = object(accessors.get(checkedIndex(index, accessors.size(),"accessor")), "accessor");
         if (spec.has("sparse") || spec.has("normalized") && spec.get("normalized").getAsBoolean())
@@ -134,6 +134,7 @@ final class GltfModelParser {
             case "VEC2" -> 2;
             case "VEC3" -> 3;
             case "VEC4" -> 4;
+            case "MAT4" -> 16;
             default -> throw new IllegalArgumentException("Unsupported glTF attribute type");
         };
         int bytesPerComponent = componentBytes(type);

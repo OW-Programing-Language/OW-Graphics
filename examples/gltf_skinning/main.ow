@@ -1,0 +1,63 @@
+# Phase 9: glTF animation sampling and GPU skinning, two bones and three tracks.
+# Each OW frame uploads a bounded joint matrix array to the GLSL vertex shader.
+import "@flow/src/App.ow"
+import "../../src/graphics/window/api/WindowApi.ow"
+import "../../src/graphics/window/infra/GlfwWindow.ow"
+import "../../src/graphics/input/api/InputApi.ow"
+import "../../src/graphics/input/infra/GlfwInput.ow"
+import "../../src/graphics/renderer/api/RendererApi.ow"
+import "../../src/graphics/renderer/opengl/OpenGLRenderer.ow"
+import "../../src/graphics/shader/api/ShaderApi.ow"
+import "../../src/graphics/shader/opengl/OpenGLShader.ow"
+import "../../src/graphics/mesh/api/MeshApi.ow"
+import "../../src/graphics/mesh/opengl/OpenGLMesh.ow"
+import "../../src/graphics/animation/api/GltfSkinApi.ow"
+import "../../src/graphics/animation/infra/GltfSkin.ow"
+
+main:
+  set app: new App()
+  call: app.use_native_as(Graphics.GltfSkin, "GRAPHICS_GLTF_SKIN")
+  call: app.use_native_as(Graphics.OpenGLMesh, "GRAPHICS_MESH")
+  call: app.use_native_as(Graphics.OpenGLShader, "GRAPHICS_SHADER")
+  call: app.use_native_as(Graphics.GlfwInput, "GRAPHICS_INPUT")
+  call: app.use_native_as(Graphics.OpenGLRenderer, "GRAPHICS_RENDERER")
+  call: app.use_native_as(Graphics.GlfwWindow, "GRAPHICS_WINDOW")
+  call: assert(app.boot() == 1, "skinning GPU flOW boot")
+  set window GRAPHICS_WINDOW: app.service("window")
+  set input GRAPHICS_INPUT: app.service("input")
+  set renderer GRAPHICS_RENDERER: app.service("renderer")
+  set mesh GRAPHICS_MESH: app.service("mesh")
+  set shader GRAPHICS_SHADER: app.service("shader")
+  set skin GRAPHICS_GLTF_SKIN: app.service("gltf_skin")
+  set rig: skin.load_rig("examples/gltf_skinning/assets/wave.glb")
+  call: assert(len(rig[10]) == 2, "two rig joints")
+  call: assert(window.open(640, 480, "OW Graphics / Skeletal Animation") == 1)
+  set meshId int: mesh.create_skinned_indexed(rig[0],rig[1],rig[2],rig[3],rig[4],rig[5])
+  set vertexSource: "#version 330 core\nlayout(location=0) in vec3 aPosition;\nlayout(location=2) in vec3 aNormal;\nlayout(location=7) in vec4 aJoints;\nlayout(location=8) in vec4 aWeights;\nuniform mat4 uBones[32];\nout vec3 nWorld;\nvoid main(){\n vec4 pos=vec4(aPosition,1.0);\n mat4 skin = aWeights.x*uBones[int(aJoints.x)]\n           + aWeights.y*uBones[int(aJoints.y)]\n           + aWeights.z*uBones[int(aJoints.z)]\n           + aWeights.w*uBones[int(aJoints.w)];\n gl_Position=skin*pos;\n nWorld=mat3(skin)*aNormal;\n}"
+  set fragmentSource: "#version 330 core\nin vec3 nWorld;\nout vec4 pixel;\nvoid main(){\n vec3 n=normalize(nWorld);\n float intensity=0.4+0.6*max(dot(n,normalize(vec3(0.4,0.65,1.0))),0.0);\n pixel=vec4(vec3(0.96,0.4,0.2)*intensity,1.0);\n}"
+  set shaderId int: shader.create(vertexSource, fragmentSource)
+  call: assert(meshId > 0, "GPU skinned mesh allocated")
+  call: assert(shaderId > 0, "GLSL skin shader compiled")
+  call: assert(shader.bind(shaderId) == 1)
+
+  # One-second looping clip. This small demo uses a frame increment; a
+  # delta-time clock/animation blend tree can be added in a later phase.
+  set progress float: 0.0
+  while: window.should_close() == 0
+    call: window.poll()
+    if: input.escape_pressed() == 1
+      call: window.request_close()
+    else:
+      set pose: skin.sample_palette(rig, progress)
+      call: shader.bind(shaderId)
+      call: shader.set_mat4_array(shaderId, "uBones", pose)
+      call: renderer.clear(12, 18, 30)
+      call: renderer.draw_mesh(meshId)
+      call: window.present()
+      set progress: progress + 0.0125
+      if: progress > 1.0
+        set progress: 0.0
+
+  call: assert(mesh.destroy(meshId) == 1, "GPU mesh freed")
+  call: assert(shader.destroy(shaderId) == 1, "shader freed")
+  call: assert(app.stop() == 1, "flOW modules stopped")

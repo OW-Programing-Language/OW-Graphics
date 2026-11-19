@@ -1,0 +1,46 @@
+# Phase 9: actual glTF/GLB two-bone rig, STEP/LINEAR pose sampling and mesh APIs.
+# OW + flOW runtime extension is needed, but the GPU/display is not.
+import "@flow/src/App.ow"
+import "../src/graphics/animation/api/GltfSkinApi.ow"
+import "../src/graphics/animation/infra/GltfSkin.ow"
+import "../src/graphics/mesh/api/MeshApi.ow"
+import "../src/graphics/mesh/headless/HeadlessMesh.ow"
+import "../src/graphics/shader/api/ShaderApi.ow"
+import "../src/graphics/shader/headless/HeadlessShader.ow"
+
+main:
+  set app: new App()
+  call: app.use_native_as(Graphics.GltfSkin, "GRAPHICS_GLTF_SKIN")
+  call: app.use_native_as(Graphics.HeadlessMesh, "GRAPHICS_MESH")
+  call: app.use_native_as(Graphics.HeadlessShader, "GRAPHICS_SHADER")
+  call: assert(app.boot() == 1, "skinned flOW boot")
+
+  set importer GRAPHICS_GLTF_SKIN: app.service("gltf_skin")
+  set meshes GRAPHICS_MESH: app.service("mesh")
+  set shaders GRAPHICS_SHADER: app.service("shader")
+  set rig: importer.load_rig("examples/gltf_skinning/assets/wave.glb")
+  call: assert(len(rig) == 14, "skinned rig fields")
+  call: assert(len(rig[0]) == 12, "four vertex positions")
+  call: assert(len(rig[4]) == 16, "four joint indices per vertex")
+  call: assert(len(rig[5]) == 16, "four skinning weights per vertex")
+  call: assert(len(rig[10]) == 2, "two joint nodes")
+  call: assert(len(rig[12]) == 3, "translation rotation and scale channels")
+  set initial: importer.sample_palette(rig, 0.0)
+  set middle: importer.sample_palette(rig, 0.5)
+  set final: importer.sample_palette(rig, 1.0)
+  call: assert(len(initial) == 2, "2 inverse bind palettes")
+  call: assert(initial[1][13] == 0.0, "tip at bind pose")
+  call: assert(middle[1][13] > 0.274, "translation interpolated")
+  call: assert(middle[1][13] < 0.276, "translation interpolated precisely")
+  call: assert(middle[1][1] > 0.258, "SLERP rotates tip")
+  call: assert(final[1][13] > 0.549, "tip moves to final position")
+  call: assert(final[1][0] > 0.95, "STEP scale applied at last sample")
+  call: assert(initial[0][0] == 1.0, "root bone remains identity")
+  call: assert(shaders.set_mat4_array(1, "uBones", middle) == 1, "shader palette contract")
+  set handle int: meshes.create_skinned_indexed(rig[0], rig[1], rig[2], rig[3], rig[4], rig[5])
+  call: assert(handle > 0, "skinned mesh contract")
+  call: assert(meshes.destroy(handle) == 1)
+  set asJson: importer.load_rig("examples/gltf_skinning/assets/wave.gltf")
+  call: assert(len(asJson[10]) == 2, "same rig from JSON glTF")
+  call: assert(app.stop() == 1)
+  print: "PASS: OW/flOW GLB skeleton, quaternion interpolation and skin palette"

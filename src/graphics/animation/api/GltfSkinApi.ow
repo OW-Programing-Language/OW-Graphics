@@ -1,0 +1,8 @@
+# glTF 2.0 animated rig with one skin/mesh/clip and 1..32 bones.
+# CPU data [positions,uv,normals,indices,joints,weights,parents,TRS,skin,IBMs,channels,meshNode].
+# sample_palette returns one column-major mat4 per skin joint; no GPU required.
+module_type GRAPHICS_GLTF_SKIN:
+  include NATIVE_LIFECYCLE
+  fn parse_rig(gltfJson string) -> array
+  fn load_rig(relativePath string) -> array
+  fn sample_palette(rig array, time float) -> array
