@@ -47,7 +47,9 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
                  "graphics.texture.destroy", "graphics.input.key_down",
                  "graphics.input.cursor_delta", "graphics.input.scroll_delta",
                  "graphics.input.mouse_button_down",
-                 "graphics.model.parse_obj", "graphics.model.load_obj" -> true;
+                 "graphics.model.parse_obj", "graphics.model.load_obj",
+                 "graphics.model.parse_gltf", "graphics.model.load_gltf",
+                 "graphics.mesh.draw_instanced" -> true;
             default -> false;
         };
     }
@@ -70,6 +72,8 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.input.scroll_delta" -> scrollDelta(args);
             case "graphics.model.parse_obj" -> parseObj(args);
             case "graphics.model.load_obj" -> loadObj(args);
+            case "graphics.model.parse_gltf" -> parseGltf(args);
+            case "graphics.model.load_gltf" -> loadGltf(args);
             case "graphics.opengl.clear" -> clearFrame(args);
             case "graphics.opengl.depth_test" -> configureDepth(args);
             case "graphics.opengl.triangle" -> drawTriangle(args);
@@ -83,6 +87,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.mesh.create_indexed" -> createIndexedMesh(args);
             case "graphics.mesh.create_lit_indexed" -> createLitMesh(args);
             case "graphics.mesh.draw" -> drawMesh(args);
+            case "graphics.mesh.draw_instanced" -> drawInstanced(args);
             case "graphics.mesh.destroy" -> destroyMesh(args);
             case "graphics.texture.create_rgba8" -> createTexture(args);
             case "graphics.texture.load_image" -> loadImage(args);
@@ -445,6 +450,17 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
         return 1;
     }
 
+    private List<Object> parseGltf(List<Object> args) {
+        count(args, 1);
+        return GltfModelParser.parse(GraphicsArguments.string(args.get(0), "glTF source"));
+    }
+
+    private List<Object> loadGltf(List<Object> args) {
+        count(args, 1);
+        return GltfModelParser.loadRelative(
+                GraphicsArguments.string(args.get(0), "glTF path"), Path.of("").toAbsolutePath());
+    }
+
     private int createMesh(List<Object> args) {
         count(args, 1);
         float[] positions = GraphicsArguments.trianglePositions(args.get(0));
@@ -506,6 +522,15 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
         int handle = GraphicsArguments.integer(args.get(0), "mesh handle");
         ensureOwner();
         resources.drawMesh(handle);
+        return 1;
+    }
+
+    private int drawInstanced(List<Object> args) {
+        count(args, 2);
+        int handle = GraphicsArguments.integer(args.get(0), "mesh handle");
+        float[] matrices = GraphicsArguments.instanceMatrices(args.get(1));
+        ensureOwner();
+        resources.drawInstanced(handle, matrices);
         return 1;
     }
 

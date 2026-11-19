@@ -1,0 +1,27 @@
+# CPU-only native provider end-to-end glTF import, then headless geometry use.
+import "@flow/src/App.ow"
+import "../src/graphics/model/api/GltfApi.ow"
+import "../src/graphics/model/infra/GltfModel.ow"
+import "../src/graphics/mesh/api/MeshApi.ow"
+import "../src/graphics/mesh/headless/HeadlessMesh.ow"
+
+main:
+  set app: new App()
+  call: app.use_native_as(Graphics.GltfModel, "GRAPHICS_GLTF_MODEL")
+  call: app.use_native_as(Graphics.HeadlessMesh, "GRAPHICS_MESH")
+  call: assert(app.boot() == 1)
+  set loader GRAPHICS_GLTF_MODEL: app.service("gltf")
+  set mesh GRAPHICS_MESH: app.service("mesh")
+  set model: loader.load_gltf("examples/gltf_instancing/assets/quad.gltf")
+  call: assert(len(model) == 7, "glTF geometry and PBR metadata")
+  call: assert(len(model[0]) == 12, "4 xyz vertices")
+  call: assert(len(model[1]) == 8, "4 UV pairs")
+  call: assert(len(model[2]) == 12, "4 normal vectors")
+  call: assert(len(model[3]) == 6, "indexed two-triangle quad")
+  call: assert(model[5] > 0.6, "metallicFactor decoded")
+  call: assert(model[6] == 0.4, "roughnessFactor decoded")
+  set handle int: mesh.create_lit_indexed(model[0], model[1], model[2], model[3])
+  call: assert(handle > 0, "glTF fits lit mesh contract")
+  call: assert(mesh.destroy(handle) == 1)
+  call: assert(app.stop() == 1)
+  print: "PASS: actual OW glTF 2.0 loading and PBR factors"

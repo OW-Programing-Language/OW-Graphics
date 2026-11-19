@@ -148,4 +148,16 @@ final class GraphicsArguments {
         return new LitGeometry(geometry, normals);
     }
 
+    /** Dense per-instance 4x4 column-major transforms, maximum 512 instances. */
+    static float[] instanceMatrices(Object source) {
+        if (!(source instanceof List<?> matrices) || matrices.isEmpty() || matrices.size() > 512)
+            throw new IllegalArgumentException("instances must contain 1..512 model matrices");
+        float[] values = new float[matrices.size() * 16];
+        for (int i = 0; i < matrices.size(); i++) {
+            float[] matrix = matrix4(matrices.get(i));
+            System.arraycopy(matrix, 0, values, i * 16, 16);
+        }
+        return values;
+    }
+
 }

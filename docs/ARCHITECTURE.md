@@ -32,6 +32,16 @@ The native `ImageAssetLoader` decodes local PNG/JPEG images into bottom-up RGBA8
 
 The `StudioMaterials` library is a pure OW service returning per-object RGBA tint and ambient/diffuse/specular/shininess parameters. The application passes these values to GLSL; OW Graphics deliberately does not claim MTL or full PBR material support.
 
+## Phase 7: embedded glTF, instancing and keyframe movement
+
+A CPU-only `GltfModelParser` uses bounded JSON and base64 buffers to decode a documented **static glTF 2.0 subset** into ordinary OW arrays and metallic/roughness factors. This is not an implementation of GLB, external URI loading, glTF node scenes, skinning or animation channels. The `GRAPHICS_GLTF_MODEL` source module depends on the runtime SPI but not on the GPU.
+
+`MakeKeyframeAnimation(Transforms)` is a pure-OW flOW functor returning linearly interpolated xyz positions at caller-supplied time. It is independent from glTF import and does not parse glTF animation tracks.
+
+`GRAPHICS_PBR_MATERIAL` returns color and metallic/roughness factors from pure OW. The demo GLSL uses a GGX/Schlick/Smith microfacet approximation with one direct light and simple tone mapping; no IBL environment or complete glTF PBR conformance.
+
+`GRAPHICS_MESH.draw_instanced(handle, modelMatrices)` validates 1–512 column-major transforms then uploads a dynamic GPU mat4 buffer for **one actual glDrawElementsInstanced call**. Each mesh owns its reusable instance VBO, deleted on mesh destruction or context teardown. The shader must declare a `mat4` at vertex attribute location 3 (occupies 3–6); older shaders and single-object draws are unchanged.
+
 ## Lifecycle
 
 `App.boot()` registers all modules, checks contracts and orders startup. `App.stop()` tears down in reverse order. Window creation is explicitly deferred until after boot; this keeps contract checking and non-GPU tests safe. OpenGL resources are released in `graphics.window.close`; opening a new window rebuilds them.
@@ -51,7 +61,8 @@ The extension holds a scoped resource registry per interpreter and context, with
 7. [ ] Vulkan backend (surface, swapchain, synchronization)
 7a. [x] Phase 5: native GLFW cursor and named inputs, pure OW orbit controller functor, two directional + point lights, sandboxed Wavefront OBJ import
 7b. [x] Phase 6: bounded PNG/JPEG loader, typed material library, scene graph and multi-object renderer
-8. [ ] MTL/PBR materials, shadow maps, batched instancing, animation and GPU scene culling
+7c. [x] Phase 7: restricted static embedded glTF, direct-light metallic/roughness, translation keyframes, GPU instancing
+8. [ ] MTL/PBR IBL materials, glTF external assets/GLB, skeleton/skin animation, shadow maps, GPU culling
 9. [ ] Native C ABI / compiler-level FFI after ow-lang supports a stable general-purpose interface
 10. [ ] Windows/macOS physical GPU smoke tests and broader graphics-driver compatibility
 

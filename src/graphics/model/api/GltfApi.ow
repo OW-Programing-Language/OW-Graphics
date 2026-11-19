@@ -1,0 +1,6 @@
+# Restricted glTF 2.0 embedded-buffer static mesh importer.
+# [xyz,uv,normals,indices,baseColor,metallic,roughness].
+module_type GRAPHICS_GLTF_MODEL:
+  include NATIVE_LIFECYCLE
+  fn parse_gltf(contents string) -> array
+  fn load_gltf(relativePath string) -> array

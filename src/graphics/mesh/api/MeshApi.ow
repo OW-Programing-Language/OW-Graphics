@@ -5,4 +5,5 @@ module_type GRAPHICS_MESH:
   fn create(positions array) -> int
   fn create_indexed(positions array, uvs array, indices array) -> int
   fn create_lit_indexed(positions array, uvs array, normals array, indices array) -> int
+  fn draw_instanced(handle int, modelMatrices array) -> int
   fn destroy(handle int) -> int

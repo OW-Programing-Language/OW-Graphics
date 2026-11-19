@@ -18,6 +18,7 @@ final class OpenGlResources {
 
     private final Map<Integer, Integer> programs = new HashMap<>();
     private final Map<Integer, Mesh> meshes = new HashMap<>();
+    private final Map<Integer, Integer> instanceBuffers = new HashMap<>();
     private final Map<Integer, Integer> textures = new HashMap<>();
     private int nextHandle = 1;
 
@@ -302,8 +303,51 @@ final class OpenGlResources {
         }
     }
 
+    /**
+     * Batch identical geometry in one OpenGL draw call using an interleaved
+     * mat4 instance buffer at vertex attributes 3, 4, 5 and 6.
+     * The buffer is reused across frames, and freed with its parent mesh.
+     * Shaders must explicitly opt into layout(location=3) in mat4 aModel.
+     */
+    void drawInstanced(int handle, float[] matrices) {
+        Mesh mesh = requireMesh(handle);
+        if (glGetInteger(GL_CURRENT_PROGRAM) == 0)
+            throw new IllegalStateException("Bind shader before instanced draw");
+        int buffer = instanceBuffers.getOrDefault(handle, 0);
+        if (buffer == 0) {
+            buffer = glGenBuffers();
+            if (buffer == 0)
+                throw new IllegalStateException("Cannot allocate instance matrix buffer");
+            instanceBuffers.put(handle, buffer);
+        }
+        FloatBuffer bufferData = BufferUtils.createFloatBuffer(matrices.length);
+        bufferData.put(matrices).flip();
+        glBindVertexArray(mesh.vao());
+        try {
+            glBindBuffer(GL_ARRAY_BUFFER, buffer);
+            glBufferData(GL_ARRAY_BUFFER, bufferData, GL_DYNAMIC_DRAW);
+            for (int i=0;i<4;i++) {
+                int attribute = 3 + i;
+                glEnableVertexAttribArray(attribute);
+                glVertexAttribPointer(attribute, 4, GL_FLOAT, false,
+                        16 * Float.BYTES, (long)(i * 4 * Float.BYTES));
+                glVertexAttribDivisor(attribute, 1);
+            }
+            int instanceCount = matrices.length / 16;
+            if (mesh.indexCount() > 0)
+                glDrawElementsInstanced(GL_TRIANGLES, mesh.indexCount(), GL_UNSIGNED_INT, 0L, instanceCount);
+            else
+                glDrawArraysInstanced(GL_TRIANGLES, 0, mesh.vertexCount(), instanceCount);
+        } finally {
+            glBindVertexArray(0);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
+    }
+
     void destroyMesh(int handle) {
         Mesh mesh = requireMesh(handle);
+        Integer instanceBuffer = instanceBuffers.remove(handle);
+        if (instanceBuffer != null) glDeleteBuffers(instanceBuffer);
         if (mesh.ebo() != 0) glDeleteBuffers(mesh.ebo());
         glDeleteBuffers(mesh.vbo());
         glDeleteVertexArrays(mesh.vao());
@@ -320,6 +364,8 @@ final class OpenGlResources {
             glDeleteVertexArrays(mesh.vao());
         }
         meshes.clear();
+        for (int buffer : instanceBuffers.values()) glDeleteBuffers(buffer);
+        instanceBuffers.clear();
         for (int texture : textures.values())
             glDeleteTextures(texture);
         textures.clear();

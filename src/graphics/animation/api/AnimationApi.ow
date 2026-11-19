@@ -1,0 +1,5 @@
+# Time-keyframed translation, linear interpolation and clamped endpoints.
+# Positions are 3-float vectors; times strictly increase in seconds.
+module_type GRAPHICS_KEYFRAME_ANIMATION:
+  include NATIVE_LIFECYCLE
+  fn translation(times array, positions array, time float) -> array
