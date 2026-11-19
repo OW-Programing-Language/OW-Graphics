@@ -2,7 +2,7 @@
 # mesh uploads: apps bind one uModel/uBones pair per actor and draw a shared mesh.
 # This first version extracts LOCAL TRANSLATION of a root common to all joints
 # during stable playback; root motion is frozen during crossfade.
-functor MakeActorCrowd(G: GRAPHICS_ANIMATION_GRAPH, L: GRAPHICS_ANIMATION_LIBRARY, Timeline: GRAPHICS_ANIMATION_TIMELINE, T: GRAPHICS_TRANSFORM) -> GRAPHICS_ANIMATION_CROWD:
+functor MakeActorCrowd(G: GRAPHICS_ANIMATION_GRAPH) -> GRAPHICS_ANIMATION_CROWD:
   fn name() -> string:
     return: "animation_crowd"
   fn requires() -> array:
@@ -56,11 +56,11 @@ functor MakeActorCrowd(G: GRAPHICS_ANIMATION_GRAPH, L: GRAPHICS_ANIMATION_LIBRAR
     if: original[0] == updated[0]
       if: original[2] < 0
         if: updated[2] < 0
-          set displacement: Timeline.root_delta(library, updated[0], root, original[1], updated[1])
+          set displacement: Graphics.GltfTimeline.root_delta(library, updated[0], root, original[1], updated[1])
           set position: [position[0] + displacement[0], position[1] + displacement[1], position[2] + displacement[2]]
-    set offset: Timeline.root_delta(library, updated[0], root, 0.0, L.loop_time(library, updated[0], updated[1]))
+    set offset: Graphics.GltfTimeline.root_delta(library, updated[0], root, 0.0, Graphics.GltfAnimationLibrary.loop_time(library, updated[0], updated[1]))
     if: updated[2] >= 0
-      set fromOffset: Timeline.root_delta(library, updated[2], root, 0.0, L.loop_time(library, updated[2], updated[3]))
+      set fromOffset: Graphics.GltfTimeline.root_delta(library, updated[2], root, 0.0, Graphics.GltfAnimationLibrary.loop_time(library, updated[2], updated[3]))
       set alpha float: updated[4] / updated[5]
       set offset: [fromOffset[0] + (offset[0] - fromOffset[0]) * alpha, fromOffset[1] + (offset[1] - fromOffset[1]) * alpha, fromOffset[2] + (offset[2] - fromOffset[2]) * alpha]
     return: [updated, position, root, offset]
@@ -100,4 +100,4 @@ functor MakeActorCrowd(G: GRAPHICS_ANIMATION_GRAPH, L: GRAPHICS_ANIMATION_LIBRAR
     call: assert(len(actor) == 4, "actor state must have four fields")
     set world: actor[1]
     call: assert(len(world) == 3, "world XYZ required")
-    return: T.translation(world[0], world[1], world[2])
+    return: Graphics.Transforms.translation(world[0], world[1], world[2])

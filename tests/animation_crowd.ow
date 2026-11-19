@@ -16,7 +16,7 @@ import "../src/graphics/math/infra/Transforms.ow"
 main:
   set sm GRAPHICS_ANIMATION_STATE_MACHINE: MakeAnimationStateMachine(Graphics.GltfAnimationLibrary)
   set graph GRAPHICS_ANIMATION_GRAPH: MakeAnimationGraph(sm)
-  set batch GRAPHICS_ANIMATION_CROWD: MakeActorCrowd(graph, Graphics.GltfAnimationLibrary, Graphics.GltfTimeline, Graphics.Transforms)
+  set batch GRAPHICS_ANIMATION_CROWD: MakeActorCrowd(graph)
   set app: new App()
   call: app.use_native_as(batch, "GRAPHICS_ANIMATION_CROWD")
   call: app.use_native_as(graph, "GRAPHICS_ANIMATION_GRAPH")
