@@ -57,6 +57,9 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
                  "graphics.animation.library.sample", "graphics.animation.library.blend",
                  "graphics.animation.library.duration", "graphics.animation.library.loop",
                  "graphics.animation.clock.now_seconds",
+                 "graphics.animation.layer.additive",
+                 "graphics.animation.timeline.root_delta",
+                 "graphics.animation.timeline.events",
                  "graphics.mesh.draw_instanced" -> true;
             default -> false;
         };
@@ -94,6 +97,9 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.animation.library.duration" -> animationClipDuration(args);
             case "graphics.animation.library.loop" -> loopAnimationTime(args);
             case "graphics.animation.clock.now_seconds" -> monotonicSeconds(args);
+            case "graphics.animation.layer.additive" -> additiveAnimationLayer(args);
+            case "graphics.animation.timeline.root_delta" -> animationRootDelta(args);
+            case "graphics.animation.timeline.events" -> animationEventsBetween(args);
             case "graphics.opengl.clear" -> clearFrame(args);
             case "graphics.opengl.depth_test" -> configureDepth(args);
             case "graphics.opengl.triangle" -> drawTriangle(args);
@@ -584,6 +590,45 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
     private double monotonicSeconds(List<Object> args) {
         count(args,0);
         return System.nanoTime()*1e-9;
+    }
+
+    private List<Object> additiveAnimationLayer(List<Object> args) {
+        count(args,8);
+        if(!(args.get(0) instanceof List<?> library))
+            throw new IllegalArgumentException("Animation library must be an array");
+        if(!(args.get(7) instanceof List<?> mask))
+            throw new IllegalArgumentException("Additive mask must be an array");
+        return GltfSkinParser.additiveClips(library,
+                GraphicsArguments.integer(args.get(1),"base clip"),
+                GraphicsArguments.finiteFloat(args.get(2),"base time"),
+                GraphicsArguments.integer(args.get(3),"layer clip"),
+                GraphicsArguments.finiteFloat(args.get(4),"layer time"),
+                GraphicsArguments.finiteFloat(args.get(5),"reference time"),
+                GraphicsArguments.finiteFloat(args.get(6),"layer weight"),mask);
+    }
+
+    private List<Double> animationRootDelta(List<Object> args) {
+        count(args,5);
+        if(!(args.get(0) instanceof List<?> library))
+            throw new IllegalArgumentException("Animation library must be an array");
+        return GltfSkinParser.rootDelta(library,
+                GraphicsArguments.integer(args.get(1),"clip"),
+                GraphicsArguments.integer(args.get(2),"motion node"),
+                GraphicsArguments.finiteFloat(args.get(3),"start time"),
+                GraphicsArguments.finiteFloat(args.get(4),"end time"));
+    }
+
+    private List<Object> animationEventsBetween(List<Object> args) {
+        count(args,5);
+        if(!(args.get(0) instanceof List<?> library))
+            throw new IllegalArgumentException("Animation library must be an array");
+        if(!(args.get(2) instanceof List<?> markers))
+            throw new IllegalArgumentException("Animation markers must be an array");
+        return GltfSkinParser.eventsBetween(library,
+                GraphicsArguments.integer(args.get(1),"clip"),
+                markers,
+                GraphicsArguments.finiteFloat(args.get(3),"start time"),
+                GraphicsArguments.finiteFloat(args.get(4),"end time"));
     }
 
     private int createSkinnedMesh(List<Object> args) {
