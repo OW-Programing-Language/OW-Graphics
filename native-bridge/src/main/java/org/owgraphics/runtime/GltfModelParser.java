@@ -173,7 +173,17 @@ final class GltfModelParser {
         return a;
     }
 
-    static List<Object> parse(String source) {
+    record EmbeddedDocument(JsonObject root, ByteBuffer data) {}
+
+    static EmbeddedDocument document(String source) {
+        return document(source, null);
+    }
+
+    /**
+     * Decode one bounded embedded buffer from .gltf JSON or from a GLB BIN
+     * chunk, leaving mesh selection to callers. Preserve single-mesh API.
+     */
+    static EmbeddedDocument document(String source, byte[] glbBinary) {
         if (source == null || source.isBlank()
                 || source.getBytes(StandardCharsets.UTF_8).length > MAX_JSON_BYTES)
             throw new IllegalArgumentException("glTF JSON must contain 1..1048576 bytes");
@@ -187,21 +197,37 @@ final class GltfModelParser {
             throw new IllegalArgumentException("Required glTF extensions are not supported");
         JsonArray buffers = array(root,"buffers");
         if (buffers.size() != 1)
-            throw new IllegalArgumentException("Exactly one embedded glTF buffer is supported");
+            throw new IllegalArgumentException("Exactly one glTF buffer is supported");
         JsonObject buffer = object(buffers.get(0),"glTF buffer");
-        String uri = buffer.get("uri").getAsString();
-        String prefix = "data:application/octet-stream;base64,";
-        if (!uri.startsWith(prefix))
-            throw new IllegalArgumentException("External/remote glTF buffer URIs are not supported");
-        String content = uri.substring(prefix.length());
-        if (content.length() > (MAX_BINARY_BYTES + 2L)/3*4 + 8)
-            throw new IllegalArgumentException("glTF data URI exceeds 4 MiB");
         byte[] decoded;
-        try { decoded = Base64.getDecoder().decode(content); }
-        catch (IllegalArgumentException e) { throw new IllegalArgumentException("Bad glTF base64 buffer",e); }
-        if (decoded.length > MAX_BINARY_BYTES || number(buffer,"byteLength",-1) > decoded.length)
+        if (glbBinary == null) {
+            if (!buffer.has("uri") || !buffer.get("uri").isJsonPrimitive())
+                throw new IllegalArgumentException("Embedded glTF must contain a data URI");
+            String uri = buffer.get("uri").getAsString();
+            String prefix = "data:application/octet-stream;base64,";
+            if (!uri.startsWith(prefix))
+                throw new IllegalArgumentException("External/remote glTF buffer URIs are not supported");
+            String content = uri.substring(prefix.length());
+            if (content.length() > (MAX_BINARY_BYTES + 2L)/3*4 + 8)
+                throw new IllegalArgumentException("glTF data URI exceeds 4 MiB");
+            try { decoded = Base64.getDecoder().decode(content); }
+            catch (IllegalArgumentException e) { throw new IllegalArgumentException("Bad glTF base64 buffer",e); }
+        } else {
+            if (buffer.has("uri"))
+                throw new IllegalArgumentException("GLB buffer must not declare a URI");
+            decoded = glbBinary;
+        }
+        int declared = number(buffer,"byteLength",-1);
+        if (decoded.length > MAX_BINARY_BYTES || declared < 1
+                || declared > decoded.length
+                || glbBinary != null && decoded.length-declared > 3)
             throw new IllegalArgumentException("glTF binary buffer is invalid or too large");
-        ByteBuffer data = ByteBuffer.wrap(decoded).order(ByteOrder.LITTLE_ENDIAN);
+        return new EmbeddedDocument(root, ByteBuffer.wrap(decoded).order(ByteOrder.LITTLE_ENDIAN));
+    }
+
+    static List<Object> parse(String source) {
+        EmbeddedDocument doc = document(source);
+        JsonObject root = doc.root();
         JsonArray meshes = array(root,"meshes");
         if (meshes.isEmpty())
             throw new IllegalArgumentException("glTF needs at least one mesh");
@@ -209,6 +235,11 @@ final class GltfModelParser {
         if (primitives.size() != 1)
             throw new IllegalArgumentException("This importer supports exactly one mesh primitive");
         JsonObject primitive = object(primitives.get(0),"primitive");
+        return parsePrimitive(root,doc.data(),primitive);
+    }
+
+    /** Decode any validated static TRIANGLES primitive of a shared document. */
+    static List<Object> parsePrimitive(JsonObject root, ByteBuffer data, JsonObject primitive) {
         if (number(primitive,"mode",4) != 4)
             throw new IllegalArgumentException("Only glTF TRIANGLES mode 4 is supported");
         JsonObject attrs = object(primitive.get("attributes"),"attributes");

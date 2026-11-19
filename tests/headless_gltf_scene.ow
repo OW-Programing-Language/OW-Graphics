@@ -1,0 +1,48 @@
+# Load actual .glb and .gltf from a CPU-only OW module; no window required.
+import "@flow/src/App.ow"
+import "../src/graphics/model/api/GltfSceneApi.ow"
+import "../src/graphics/model/infra/GltfScene.ow"
+import "../src/graphics/math/api/TransformApi.ow"
+import "../src/graphics/math/infra/Transforms.ow"
+import "../src/graphics/scene/api/SceneGraphApi.ow"
+import "../src/graphics/scene/infra/MakeSceneGraph.ow"
+import "../src/graphics/mesh/api/MeshApi.ow"
+import "../src/graphics/mesh/headless/HeadlessMesh.ow"
+
+main:
+  set graph GRAPHICS_SCENE_GRAPH: MakeSceneGraph(Graphics.Transforms)
+  set app: new App()
+  call: app.use_native_as(graph, "GRAPHICS_SCENE_GRAPH")
+  call: app.use_native_as(Graphics.GltfScene, "GRAPHICS_GLTF_SCENE")
+  call: app.use_native_as(Graphics.HeadlessMesh, "GRAPHICS_MESH")
+  call: app.use_native_as(Graphics.Transforms, "GRAPHICS_TRANSFORM")
+  call: assert(app.boot() == 1, "flOW scene parser boot")
+  set importer GRAPHICS_GLTF_SCENE: app.service("gltf_scene")
+  set world GRAPHICS_SCENE_GRAPH: app.service("scene_graph")
+  set meshes GRAPHICS_MESH: app.service("mesh")
+
+  set scene: importer.load_scene("examples/gltf_scene/assets/multi_scene.glb")
+  call: assert(len(scene) == 4, "scene package fields")
+  call: assert(len(scene[0]) == 3, "3 unique glTF mesh primitives")
+  call: assert(len(scene[1]) == 4, "4 scene graph nodes")
+  call: assert(scene[1][0] == 0 - 1, "root parent -1")
+  call: assert(scene[1][1] == 0, "child placed immediately after root")
+  call: assert(scene[1][2] == 0, "reordered sibling also parented to root")
+  call: assert(len(scene[3][0]) == 0, "empty root geometry")
+  call: assert(scene[3][1][0] == 2, "first rendered child uses mesh 1")
+  call: assert(len(scene[3][2]) == 2, "mesh 0 has two primitives")
+  set matrix: world.resolve(scene[1], scene[2])
+  call: assert(matrix[1][12] > 0.64, "right panel inherits parent translation")
+  call: assert(matrix[2][12] < 0.0 - 0.64, "left panel inherits parent translation")
+  call: assert(matrix[3][13] == 0.0 - 0.9, "second root translation")
+  set i int: 0
+  while: i < len(scene[0])
+    set primitive: scene[0][i]
+    set meshId int: meshes.create_lit_indexed(primitive[0], primitive[1], primitive[2], primitive[3])
+    call: assert(meshId > 0, "GLB primitive is valid indexed geometry")
+    call: assert(meshes.destroy(meshId) == 1)
+    set i: i + 1
+  set asJson: importer.load_scene("examples/gltf_scene/assets/multi_scene.gltf")
+  call: assert(len(asJson[0]) == 3, "same layout from JSON glTF")
+  call: assert(app.stop() == 1)
+  print: "PASS: OW/flOW GLB & glTF multi-primitive static scene and hierarchy"

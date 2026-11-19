@@ -49,6 +49,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
                  "graphics.input.mouse_button_down",
                  "graphics.model.parse_obj", "graphics.model.load_obj",
                  "graphics.model.parse_gltf", "graphics.model.load_gltf",
+                 "graphics.scene.parse_gltf", "graphics.scene.load_gltf",
                  "graphics.mesh.draw_instanced" -> true;
             default -> false;
         };
@@ -74,6 +75,8 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.model.load_obj" -> loadObj(args);
             case "graphics.model.parse_gltf" -> parseGltf(args);
             case "graphics.model.load_gltf" -> loadGltf(args);
+            case "graphics.scene.parse_gltf" -> parseSceneGltf(args);
+            case "graphics.scene.load_gltf" -> loadSceneGltf(args);
             case "graphics.opengl.clear" -> clearFrame(args);
             case "graphics.opengl.depth_test" -> configureDepth(args);
             case "graphics.opengl.triangle" -> drawTriangle(args);
@@ -459,6 +462,21 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
         count(args, 1);
         return GltfModelParser.loadRelative(
                 GraphicsArguments.string(args.get(0), "glTF path"), Path.of("").toAbsolutePath());
+    }
+
+    /** Decodes a complete static glTF scene on CPU without a GL context. */
+    private List<Object> parseSceneGltf(List<Object> args) {
+        count(args, 1);
+        return GltfSceneParser.parseJson(
+                GraphicsArguments.string(args.get(0), "scene JSON"));
+    }
+
+    /** Supports project-relative .gltf JSON and binary .glb scene containers. */
+    private List<Object> loadSceneGltf(List<Object> args) {
+        count(args, 1);
+        return GltfSceneParser.loadRelative(
+                GraphicsArguments.string(args.get(0), "scene filename"),
+                Path.of("").toAbsolutePath());
     }
 
     private int createMesh(List<Object> args) {

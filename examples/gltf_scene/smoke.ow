@@ -1,0 +1,123 @@
+# Phase 8: actual GLB binary container, two glTF meshes and four scene nodes.
+# Loading, hierarchy composition and GPU handles are separate flOW services.
+import "@flow/src/App.ow"
+import "../../src/graphics/window/api/WindowApi.ow"
+import "../../src/graphics/window/infra/GlfwWindow.ow"
+import "../../src/graphics/input/api/InputApi.ow"
+import "../../src/graphics/input/infra/GlfwInput.ow"
+import "../../src/graphics/renderer/api/RendererApi.ow"
+import "../../src/graphics/renderer/opengl/OpenGLRenderer.ow"
+import "../../src/graphics/shader/api/ShaderApi.ow"
+import "../../src/graphics/shader/opengl/OpenGLShader.ow"
+import "../../src/graphics/mesh/api/MeshApi.ow"
+import "../../src/graphics/mesh/opengl/OpenGLMesh.ow"
+import "../../src/graphics/texture/api/TextureApi.ow"
+import "../../src/graphics/texture/opengl/OpenGLTexture.ow"
+import "../../src/graphics/math/api/TransformApi.ow"
+import "../../src/graphics/math/infra/Transforms.ow"
+import "../../src/graphics/camera/api/CameraApi.ow"
+import "../../src/graphics/camera/infra/Camera.ow"
+import "../../src/graphics/model/api/GltfSceneApi.ow"
+import "../../src/graphics/model/infra/GltfScene.ow"
+import "../../src/graphics/scene/api/SceneGraphApi.ow"
+import "../../src/graphics/scene/infra/MakeSceneGraph.ow"
+import "../../src/graphics/scene/api/MultiSceneApi.ow"
+import "../../src/graphics/scene/infra/MakeMultiScene.ow"
+
+main:
+  set graph GRAPHICS_SCENE_GRAPH: MakeSceneGraph(Graphics.Transforms)
+  set drawing GRAPHICS_MULTI_SCENE: MakeMultiScene(Graphics.OpenGLRenderer)
+  set app: new App()
+  call: app.use_native_as(graph, "GRAPHICS_SCENE_GRAPH")
+  call: app.use_native_as(drawing, "GRAPHICS_MULTI_SCENE")
+  call: app.use_native_as(Graphics.GltfScene, "GRAPHICS_GLTF_SCENE")
+  call: app.use_native_as(Graphics.Camera, "GRAPHICS_CAMERA")
+  call: app.use_native_as(Graphics.Transforms, "GRAPHICS_TRANSFORM")
+  call: app.use_native_as(Graphics.OpenGLTexture, "GRAPHICS_TEXTURE")
+  call: app.use_native_as(Graphics.OpenGLMesh, "GRAPHICS_MESH")
+  call: app.use_native_as(Graphics.OpenGLShader, "GRAPHICS_SHADER")
+  call: app.use_native_as(Graphics.GlfwInput, "GRAPHICS_INPUT")
+  call: app.use_native_as(Graphics.OpenGLRenderer, "GRAPHICS_RENDERER")
+  call: app.use_native_as(Graphics.GlfwWindow, "GRAPHICS_WINDOW")
+  call: assert(app.boot() == 1, "glTF scene flOW boot")
+
+  set window GRAPHICS_WINDOW: app.service("window")
+  set input GRAPHICS_INPUT: app.service("input")
+  set renderer GRAPHICS_RENDERER: app.service("renderer")
+  set shader GRAPHICS_SHADER: app.service("shader")
+  set mesh GRAPHICS_MESH: app.service("mesh")
+  set textures GRAPHICS_TEXTURE: app.service("texture")
+  set camera GRAPHICS_CAMERA: app.service("camera")
+  set t GRAPHICS_TRANSFORM: app.service("transforms")
+  set importer GRAPHICS_GLTF_SCENE: app.service("gltf_scene")
+  set graphService GRAPHICS_SCENE_GRAPH: app.service("scene_graph")
+  set sceneRenderer GRAPHICS_MULTI_SCENE: app.service("multi_scene")
+  call: assert(window.open(640, 480, "OW Graphics / GLB Multi-Mesh Scene") == 1)
+  call: assert(renderer.depth_test(1) == 1)
+
+  # CPU import [primitives, parents, local model matrices, node primitive lists].
+  set content: importer.load_scene("examples/gltf_scene/assets/multi_scene.glb")
+  call: assert(len(content) == 4, "GLB scene fields")
+  set data: content[0]
+  set world: graphService.resolve(content[1], content[2])
+  set nodePrimitives: content[3]
+  set handles: array(len(data), 0)
+  set i int: 0
+  while: i < len(data)
+    set primitive: data[i]
+    set handle int: mesh.create_lit_indexed(primitive[0], primitive[1], primitive[2], primitive[3])
+    call: assert(handle > 0, "GLB primitive upload")
+    set handles[i]: handle
+    set i: i + 1
+
+  set textureId int: textures.load_image("examples/material_scene/assets/checker.png")
+  set vertexSource: "#version 330 core\nlayout(location=0) in vec3 aPos;\nlayout(location=1) in vec2 aUv;\nlayout(location=2) in vec3 aNormal;\nout vec2 vUv;\nout vec3 vNormal;\nout vec3 vWorld;\nuniform mat4 uModel;\nuniform mat4 uView;\nuniform mat4 uProjection;\nvoid main(){\n vec4 world=uModel*vec4(aPos,1.0);\n vWorld=world.xyz;\n vUv=aUv;\n vNormal=mat3(uModel)*aNormal;\n gl_Position=uProjection*uView*world;\n}"
+  set fragmentSource: "#version 330 core\nin vec2 vUv;\nin vec3 vNormal;\nin vec3 vWorld;\nout vec4 pixel;\nuniform sampler2D uTexture;\nuniform vec4 uBaseColor;\nuniform vec4 uSurface;\nuniform vec4 uEye;\nuniform vec4 uLight;\nvoid main(){\n const float PI=3.14159265359;\n vec3 base=pow(max(texture(uTexture,vUv).rgb*uBaseColor.rgb,vec3(0.0)),vec3(2.2));\n float metallic=clamp(uSurface.x,0.0,1.0);\n float roughness=clamp(uSurface.y,0.05,1.0);\n vec3 N=normalize(vNormal);\n vec3 V=normalize(uEye.xyz-vWorld);\n vec3 L=normalize(uLight.xyz);\n vec3 H=normalize(V+L);\n float NoV=max(dot(N,V),0.0);\n float NoL=max(dot(N,L),0.0);\n float NoH=max(dot(N,H),0.0);\n float HoV=max(dot(H,V),0.0);\n float a=roughness*roughness;\n float a2=a*a;\n float D=a2/(PI*pow(NoH*NoH*(a2-1.0)+1.0,2.0)+0.0001);\n float k=(roughness+1.0)*(roughness+1.0)/8.0;\n float G=(NoV/(NoV*(1.0-k)+k))*(NoL/(NoL*(1.0-k)+k));\n vec3 f0=mix(vec3(0.04),base,metallic);\n vec3 F=f0+(vec3(1.0)-f0)*pow(1.0-HoV,5.0);\n vec3 spec=D*G*F/(4.0*NoV*NoL+0.001);\n vec3 kd=(vec3(1.0)-F)*(1.0-metallic);\n vec3 lit=(kd*base/PI+spec)*vec3(2.5)*NoL+base*0.04;\n vec3 mapped=lit/(lit+vec3(1.0));\n pixel=vec4(pow(mapped,vec3(1.0/2.2)),uBaseColor.a);\n}"
+  set shaderId int: shader.create(vertexSource, fragmentSource)
+  call: assert(textureId > 0, "PNG texture uploaded")
+  call: assert(shaderId > 0, "GGX direct light program")
+  set view: camera.look_at(0.0, 0.0, 3.2, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+  set projection: camera.perspective(1.0471975512, 1.333333333333, 0.1, 50.0)
+  call: assert(shader.bind(shaderId) == 1)
+  call: assert(shader.set_mat4(shaderId, "uView", view) == 1)
+  call: assert(shader.set_mat4(shaderId, "uProjection", projection) == 1)
+  call: assert(shader.set_vec4(shaderId, "uEye", 0.0, 0.0, 3.2, 1.0) == 1)
+  call: assert(shader.set_vec4(shaderId, "uLight", 0.3, 0.8, 1.0, 0.0) == 1)
+  call: assert(shader.set_int(shaderId, "uTexture", 0) == 1)
+  call: assert(textures.bind(textureId, 0) == 1)
+
+  call: assert(len(data) == 3, "three unique primitives")
+  call: assert(len(world) == 4, "four hierarchical nodes")
+  call: assert(len(nodePrimitives[2]) == 2, "second child has two primitives")
+  call: assert(world[1][12] > 0.64, "world child transform")
+  call: assert(world[2][12] < 0.0 - 0.64, "world child transform")
+
+  call: shader.bind(shaderId)
+  call: textures.bind(textureId, 0)
+  call: sceneRenderer.begin_frame(10, 16, 26)
+  set node int: 0
+  while: node < len(world)
+    set refs: nodePrimitives[node]
+    set p int: 0
+    while: p < len(refs)
+      set index int: refs[p]
+      set primitive: data[index]
+      set tint: primitive[4]
+      call: shader.set_mat4(shaderId, "uModel", world[node])
+      call: shader.set_vec4(shaderId, "uBaseColor", tint[0], tint[1], tint[2], tint[3])
+      call: shader.set_vec4(shaderId, "uSurface", primitive[5], primitive[6], 0.0, 0.0)
+      call: sceneRenderer.draw_object(handles[index])
+      set p: p + 1
+    set node: node + 1
+  call: window.present()
+
+
+  call: textures.destroy(textureId)
+  set i: 0
+  while: i < len(handles)
+    call: mesh.destroy(handles[i])
+    set i: i + 1
+  call: shader.destroy(shaderId)
+  call: app.stop()
+
+  print: "PASS: OW/flOW GLB scene, multiple meshes/materials, hierarchy and GPU lifecycle"
