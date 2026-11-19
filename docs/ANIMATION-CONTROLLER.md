@@ -56,3 +56,7 @@ See [`examples/animation_controller/main.ow`](../examples/animation_controller/m
 Bounded input: one GLB skin/mesh, max 32 bones and 64 nodes; 16 clips, 32 tracks per clip, 256 keys per track; additive mask contains at most 64 unique node IDs; markers max 128, crossings max 128 loops and results max 128 events. Times are nonnegative, ordered and bounded in query duration. There is no generalized node graph editor, event subscription bus, automatic root-motion integration, multi-character animation pooling, IK, morph animation or Vulkan.
 
 The tests verify CPU animation math, strict bad-data rejection, the typed OW/flOW functor lifecycle, headless state transitions, and real Mesa/OpenGL pixel motion for overlays and the Walk root joint.
+
+## Phase 12 expansion
+
+`MakeAnimationGraph(StateMachine)` now adds prioritized, configurable trigger transitions without rewriting the pure OW state machine. `MakeActorCrowd(Graph)` adds independently updated actor timelines and a bounded translation-only solution to applying root-motion deltas exactly once. The original Phase 11 APIs remain unchanged. See [Animation Graphs and Crowds](ANIMATION-GRAPHS-AND-CROWD.md) for the actor state contract and the real multi-actor OpenGL example.
