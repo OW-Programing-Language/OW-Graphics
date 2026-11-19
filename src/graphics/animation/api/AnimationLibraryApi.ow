@@ -1,0 +1,11 @@
+# Animated glTF 2.0 clip library; the original GRAPHICS_GLTF_SKIN stays unchanged.
+# Layout: [rig14, allClips, clipNames, durationsSeconds].
+# sample_clip clamps; loop_time wraps opt-in; blend_clips mixes *local TRS*.
+module_type GRAPHICS_ANIMATION_LIBRARY:
+  include NATIVE_LIFECYCLE
+  fn load_library(relativePath string) -> array
+  fn parse_library(gltfJson string) -> array
+  fn clip_duration(library array, clip int) -> float
+  fn loop_time(library array, clip int, seconds float) -> float
+  fn sample_clip(library array, clip int, seconds float) -> array
+  fn blend_clips(library array, sourceClip int, sourceTime float, destinationClip int, destinationTime float, weight float) -> array
