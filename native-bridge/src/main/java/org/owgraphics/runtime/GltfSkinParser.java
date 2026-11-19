@@ -413,38 +413,80 @@ final class GltfSkinParser {
         return result;
     }
 
+    private static double[] key(String interpolation,List<?> values,int index) {
+        Object item=values.get(index);
+        if(interpolation.equals("CUBICSPLINE")) {
+            List<?> triple=requiredList(item,"cubic keyframe",3);
+            if(triple.size()!=3)
+                throw new IllegalArgumentException("Cubic keyframe needs in/value/out");
+            item=triple.get(1);
+        }
+        return toDouble(requiredList(item,"keyframe",4));
+    }
+    private static double[] tangent(List<?> values,int index,int slot) {
+        List<?> triple=requiredList(values.get(index),"cubic triplet",3);
+        if(triple.size()!=3)
+            throw new IllegalArgumentException("Cubic keyframe needs in/value/out");
+        return toDouble(requiredList(triple.get(slot),"cubic tangent",4));
+    }
+
+    /** Shortest-arc quaternion interpolation for rotation channels and crossfades. */
+    private static double[] slerp(double[] from,double[] to,double factor) {
+        if(from.length!=4||to.length!=4)
+            throw new IllegalArgumentException("SLERP requires quaternion VEC4");
+        double[] a=normalizeQuaternion(list(from)),b=normalizeQuaternion(list(to));
+        double dot=0;
+        for(int i=0;i<4;i++)dot+=a[i]*b[i];
+        if(dot<0) {
+            for(int i=0;i<4;i++)b[i]=-b[i];
+            dot=-dot;
+        }
+        dot=Math.max(-1,Math.min(1,dot));
+        double k0=1-factor,k1=factor;
+        if(dot<0.9995) {
+            double omega=Math.acos(dot),sin=Math.sin(omega);
+            k0=Math.sin((1-factor)*omega)/sin;
+            k1=Math.sin(factor*omega)/sin;
+        }
+        double[] mixed=new double[4];
+        for(int i=0;i<4;i++)mixed[i]=k0*a[i]+k1*b[i];
+        return normalizeQuaternion(list(mixed));
+    }
+
     private static double[] sampled(String path,String interp,List<?> times,List<?> values,double time) {
         int n=times.size();
         int hi=0;
         while(hi<n && time>=num(times.get(hi)))hi++;
-        if(hi==0)return toDouble(requiredList(values.get(0),"keyframe",4));
-        if(hi==n)return toDouble(requiredList(values.get(n-1),"keyframe",4));
-        if(interp.equals("STEP"))return toDouble(requiredList(values.get(hi-1),"keyframe",4));
+        if(hi==0)return key(interp,values,0);
+        if(hi==n)return key(interp,values,n-1);
+        if(interp.equals("STEP"))return key(interp,values,hi-1);
+
         double start=num(times.get(hi-1)),end=num(times.get(hi));
+        if(end<=start)throw new IllegalArgumentException("Animation times must strictly increase");
         double alpha=(time-start)/(end-start);
-        double[] a=toDouble(requiredList(values.get(hi-1),"keyframe",4));
-        double[] b=toDouble(requiredList(values.get(hi),"keyframe",4));
-        if(path.equals("rotation")) {
-            double dot=0;
-            for(int i=0;i<4;i++)dot+=a[i]*b[i];
-            if(dot<0) {
-                for(int i=0;i<4;i++)b[i]=-b[i];
-                dot=-dot;
-            }
-            dot=Math.max(-1,Math.min(1,dot));
-            double k0=1-alpha,k1=alpha;
-            if(dot<0.9995) {
-                double omega=Math.acos(dot),sin=Math.sin(omega);
-                k0=Math.sin((1-alpha)*omega)/sin;
-                k1=Math.sin(alpha*omega)/sin;
-            }
-            double[] result=new double[4];
-            for(int i=0;i<4;i++)result[i]=k0*a[i]+k1*b[i];
-            return normalizeQuaternion(list(result));
+        double[] a=key(interp,values,hi-1),b=key(interp,values,hi);
+        if(interp.equals("CUBICSPLINE")) {
+            double[] out=tangent(values,hi-1,2),in=tangent(values,hi,0);
+            if(out.length!=a.length||in.length!=a.length||b.length!=a.length)
+                throw new IllegalArgumentException("Cubic tangent dimension mismatch");
+            double t2=alpha*alpha,t3=t2*alpha;
+            double h00=2*t3-3*t2+1,h10=t3-2*t2+alpha;
+            double h01=-2*t3+3*t2,h11=t3-t2;
+            double dt=end-start;
+            double[] result=new double[a.length];
+            for(int i=0;i<a.length;i++)
+                result[i]=finite(h00*a[i]+h10*dt*out[i]+h01*b[i]+h11*dt*in[i],
+                        "CUBICSPLINE sample");
+            return path.equals("rotation")?normalizeQuaternion(list(result)):result;
         }
-        double[] result=new double[a.length];
-        for(int i=0;i<a.length;i++)result[i]=a[i]+alpha*(b[i]-a[i]);
-        return result;
+        if(interp.equals("LINEAR")) {
+            if(path.equals("rotation"))return slerp(a,b,alpha);
+            double[] result=new double[a.length];
+            for(int i=0;i<a.length;i++)
+                result[i]=finite(a[i]+alpha*(b[i]-a[i]),"LINEAR sample");
+            return result;
+        }
+        throw new IllegalArgumentException("Unknown animation interpolation");
     }
     private static double[] toDouble(List<?> values) {
         double[] out=new double[values.size()];
@@ -466,12 +508,10 @@ final class GltfSkinParser {
         return result;
     }
 
-    /**
-     * Samples the first animation clip, returning one skin palette mat4/joint.
-     * World transforms are computed in model-local space as:
-     * inverse(meshWorld) * jointWorld * inverseBindMatrix.
-     */
-    static List<Object> sample(List<?> rig,double time) {
+    /** One sampled TRS pose per glTF node, not a blended matrix palette. */
+    private record Pose(List<double[]> translations,List<double[]> rotations,List<double[]> scales) {}
+
+    private static Pose pose(List<?> rig,double time) {
         finite(time,"animation time");
         if(rig==null || rig.size()!=14)
             throw new IllegalArgumentException("Animation rig needs 14 fields");
@@ -499,7 +539,7 @@ final class GltfSkinParser {
                 throw new IllegalArgumentException("Channel target out of range");
             String path=(String)channel.get(1),interp=(String)channel.get(2);
             if(!path.equals("translation")&&!path.equals("rotation")&&!path.equals("scale")
-                    ||!interp.equals("LINEAR")&&!interp.equals("STEP"))
+                    ||!interp.equals("LINEAR")&&!interp.equals("STEP")&&!interp.equals("CUBICSPLINE"))
                 throw new IllegalArgumentException("Unsupported animation path/interpolation");
             List<?> times=requiredList(channel.get(3),"times",MAX_KEYS);
             List<?> values=requiredList(channel.get(4),"values",MAX_KEYS);
@@ -513,8 +553,18 @@ final class GltfSkinParser {
                 default -> throw new AssertionError("Impossible path");
             }
         }
+
+        return new Pose(t,r,s);
+    }
+
+    /** Return the mesh-local skinning palette for an already blended TRS pose. */
+    private static List<Object> palette(List<?> rig,Pose pose) {
+        List<?> parents=requiredList(rig.get(6),"parents",MAX_NODES);
+        int n=parents.size();
+        if(pose.translations().size()!=n || pose.rotations().size()!=n || pose.scales().size()!=n)
+            throw new IllegalArgumentException("Sampled pose node counts mismatch");
         List<double[]> local=new ArrayList<>();
-        for(int i=0;i<n;i++)local.add(matrix(list(t.get(i)),list(r.get(i)),list(s.get(i))));
+        for(int i=0;i<n;i++)local.add(matrix(list(pose.translations().get(i)),list(pose.rotations().get(i)),list(pose.scales().get(i))));
         double[][] cache=new double[n][];
         byte[] state=new byte[n];
         List<?> skinJoints=requiredList(rig.get(10),"skin joints",MAX_JOINTS);
@@ -536,4 +586,85 @@ final class GltfSkinParser {
         }
         return palette;
     }
+
+    /** Old Phase 9 single-clip entry point is intentionally backward compatible. */
+    static List<Object> sample(List<?> rig,double time) {
+        return palette(rig,pose(rig,time));
+    }
+
+    private static List<?> library(List<?> lib) {
+        if(lib==null || lib.size()!=4)
+            throw new IllegalArgumentException("Animation library needs rig, clips, names and durations");
+        List<?> rig=requiredList(lib.get(0),"library rig",14);
+        if(rig.size()!=14)throw new IllegalArgumentException("Base rig needs 14 fields");
+        return rig;
+    }
+    private static List<?> clip(List<?> lib,int index) {
+        library(lib);
+        List<?> clips=requiredList(lib.get(1),"animation clips",MAX_CLIPS);
+        if(index<0||index>=clips.size())
+            throw new IllegalArgumentException("Clip index out of range");
+        return requiredList(clips.get(index),"clip channels",MAX_CHANNELS);
+    }
+    private static List<Object> rigClip(List<?> lib,int clipId) {
+        List<?> rig=library(lib);
+        List<?> channels=clip(lib,clipId);
+        List<Object> chosen=new ArrayList<>(rig);
+        chosen.set(12,channels);
+        return chosen;
+    }
+
+    static double clipDuration(List<?> lib,int index) {
+        clip(lib,index);
+        List<?> durations=requiredList(lib.get(3),"clip durations",MAX_CLIPS);
+        if(index>=durations.size())
+            throw new IllegalArgumentException("Clip duration missing");
+        double duration=num(durations.get(index));
+        if(duration<0)throw new IllegalArgumentException("Invalid clip duration");
+        return duration;
+    }
+    /** Time wrapping is opt-in; raw sample_clip clamps to animation endpoints. */
+    static double loopTime(List<?> lib,int index,double seconds) {
+        finite(seconds,"elapsed animation time");
+        double duration=clipDuration(lib,index);
+        if(duration<=0)return 0;
+        double wrapped=seconds%duration;
+        if(wrapped<0)wrapped+=duration;
+        return wrapped;
+    }
+
+    static List<Object> sampleClip(List<?> lib,int index,double seconds) {
+        return sample(rigClip(lib,index),seconds);
+    }
+
+    /**
+     * Blend sampled per-node local translation/scale and quaternion rotation;
+     * do not lerp matrices/joint palettes, which breaks rigid rotations.
+     */
+    static List<Object> blendClips(List<?> lib,int first,double firstTime,
+                                   int second,double secondTime,double alpha) {
+        if(!Double.isFinite(alpha)||alpha<0||alpha>1)
+            throw new IllegalArgumentException("Crossfade alpha must be in [0,1]");
+        List<?> rig=library(lib);
+        if(alpha==0)return sampleClip(lib,first,firstTime);
+        if(alpha==1)return sampleClip(lib,second,secondTime);
+        Pose a=pose(rigClip(lib,first),firstTime);
+        Pose b=pose(rigClip(lib,second),secondTime);
+        int n=a.translations().size();
+        List<double[]> t=new ArrayList<>(),r=new ArrayList<>(),s=new ArrayList<>();
+        for(int i=0;i<n;i++) {
+            double[] at=a.translations().get(i),bt=b.translations().get(i);
+            double[] as=a.scales().get(i),bs=b.scales().get(i);
+            double[] mixedT=new double[3],mixedS=new double[3];
+            for(int c=0;c<3;c++) {
+                mixedT[c]=finite(at[c]+alpha*(bt[c]-at[c]),"blended translation");
+                mixedS[c]=finite(as[c]+alpha*(bs[c]-as[c]),"blended scale");
+            }
+            t.add(mixedT);
+            s.add(mixedS);
+            r.add(slerp(a.rotations().get(i),b.rotations().get(i),alpha));
+        }
+        return palette(rig,new Pose(t,r,s));
+    }
+
 }
