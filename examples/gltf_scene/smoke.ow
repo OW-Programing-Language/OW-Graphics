@@ -92,24 +92,24 @@ main:
   call: assert(world[1][12] > 0.64, "world child transform")
   call: assert(world[2][12] < 0.0 - 0.64, "world child transform")
 
-    call: shader.bind(shaderId)
-    call: textures.bind(textureId, 0)
-    call: sceneRenderer.begin_frame(10, 16, 26)
-    set node int: 0
-    while: node < len(world)
-      set refs: nodePrimitives[node]
-      set p int: 0
-      while: p < len(refs)
-        set index int: refs[p]
-        set primitive: data[index]
-        set tint: primitive[4]
-        call: shader.set_mat4(shaderId, "uModel", world[node])
-        call: shader.set_vec4(shaderId, "uBaseColor", tint[0], tint[1], tint[2], tint[3])
-        call: shader.set_vec4(shaderId, "uSurface", primitive[5], primitive[6], 0.0, 0.0)
-        call: sceneRenderer.draw_object(handles[index])
-        set p: p + 1
-      set node: node + 1
-    call: window.present()
+  call: shader.bind(shaderId)
+  call: textures.bind(textureId, 0)
+  call: sceneRenderer.begin_frame(10, 16, 26)
+  set node int: 0
+  while: node < len(world)
+    set refs: nodePrimitives[node]
+    set p int: 0
+    while: p < len(refs)
+      set index int: refs[p]
+      set primitive: data[index]
+      set tint: primitive[4]
+      call: shader.set_mat4(shaderId, "uModel", world[node])
+      call: shader.set_vec4(shaderId, "uBaseColor", tint[0], tint[1], tint[2], tint[3])
+      call: shader.set_vec4(shaderId, "uSurface", primitive[5], primitive[6], 0.0, 0.0)
+      call: sceneRenderer.draw_object(handles[index])
+      set p: p + 1
+    set node: node + 1
+  call: window.present()
 
 
   call: textures.destroy(textureId)
