@@ -2,7 +2,7 @@
 
 **A modular graphics toolkit for the OW programming language, built with flOW.**
 
-OW Graphics provides typed OW modules for windows, input, rendering and scene composition. The first backend targets **OpenGL 3.3** through an installable Java runtime extension using **LWJGL + native GLFW/OpenGL libraries**. Applications can supply their own GLSL shaders, meshes, vec4/sampler/mat4 uniforms, RGBA8 textures, indexed geometry, **perspective cameras**, **depth testing** and **diffuse lighting**, interactive orbit-camera input, a three-light rig, bounded Wavefront OBJ model importing, **PNG/JPEG texture loading**, per-object materials, a hierarchical scene graph, static **glTF 2.0** importing, direct-light **GGX metallic-roughness**, translation keyframes, GPU instancing, and **GLB/multi-mesh static scenes with parent-child transforms**. A headless renderer exercises the same typed contracts without native libraries.
+OW Graphics provides typed OW modules for windows, input, rendering and scene composition. The first backend targets **OpenGL 3.3** through an installable Java runtime extension using **LWJGL + native GLFW/OpenGL libraries**. Applications can supply their own GLSL shaders, meshes, vec4/sampler/mat4 uniforms, RGBA8 textures, indexed geometry, **perspective cameras**, **depth testing** and **diffuse lighting**, interactive orbit-camera input, a three-light rig, bounded Wavefront OBJ model importing, **PNG/JPEG texture loading**, per-object materials, a hierarchical scene graph, static **glTF 2.0** importing, direct-light **GGX metallic-roughness**, translation keyframes, GPU instancing, and **GLB/multi-mesh static scenes with parent-child transforms**. The new animation library also supports **multiple glTF clips, CUBICSPLINE Hermite interpolation, local-TRS crossfades and monotonic-time playback**. A headless renderer exercises the same typed contracts without native libraries.
 
 > **Status: early development (v0.1 foundation).** This is not a complete graphics engine. Vulkan, production shader/texture APIs, native AOT output and cross-platform GUI tests are planned rather than claimed as complete.
 
@@ -28,7 +28,7 @@ src/graphics/
   lighting/{api,infra}/           # daylight and studio multi-light presets
   model/{api,infra}/              # bounded Wavefront OBJ, glTF 2.0 + GLB scenes
   material/{api,infra}/           # pure OW Phong and metallic-roughness presets
-  animation/{api,infra}/          # OW keyframes and glTF skeletal animation bridge
+  animation/{api,infra}/          # OW keyframes, glTF skin, multi-clip library + monotonic clock
 native-bridge/                     # Maven Java RuntimeExtension + LWJGL natives
 tests/headless_flow.ow             # flOW integration without a display
 tests/headless_resources.ow        # GPU-free shader/mesh contract test
@@ -40,6 +40,7 @@ examples/material_scene/          # real PNG, 2 material instances and 2 hierarc
 examples/gltf_instancing/         # glTF mesh, GGX shading, animation, GPU instancing
 examples/gltf_scene/              # binary GLB, multiple meshes/materials + scene nodes
 examples/gltf_skinning/           # original 2-joint animated GLB and GPU skinning
+examples/animation_library/       # Wave/Bounce GLB, Hermite, crossfades, real-time playback
 docs/{ARCHITECTURE,DEVELOPMENT}.md
 ```
 
@@ -66,7 +67,7 @@ The test registers a scene **before** its renderer, checks flOW boot ordering, r
 
 Build the extension against a sibling checkout of `ow-lang` and then launch the OW interpreter with the provider on the Java classpath. Complete commands (Linux/macOS and Windows): **[Development guide](docs/DEVELOPMENT.md)**.
 
-The original GUI draws a built-in triangle. [`programmable_triangle`](examples/programmable_triangle/main.ow) compiles custom GLSL. [`textured_quad`](examples/textured_quad/main.ow) adds a two-triangle indexed quad with UVs, an RGBA8 texture and model matrix, all configured in OW. [`rotating_cube`](examples/rotating_cube/main.ow) adds a spinning, textured cube with lighting, perspective and actual depth testing. The [`model_viewer`](examples/model_viewer/main.ow) loads a local OBJ and adds left-mouse dragging, scroll zoom, arrow-key orbiting, and two directional lights plus one attenuated point light. The new [`material_scene`](examples/material_scene/main.ow) loads a real checkerboard PNG and renders two OBJ models in a parent-child hierarchy, with independent copper and azure Phong-style material settings. The [`gltf_instancing`](examples/gltf_instancing/main.ow) demo loads an embedded-buffer glTF model and uses two GPU draws for three animated/material-different instances with direct-light GGX metallic/roughness shading. The [`gltf_scene`](examples/gltf_scene/main.ow) example loads an actual binary GLB with three mesh primitives, glTF parent/child transforms and distinct per-primitive metallic/roughness values. The [`gltf_skinning`](examples/gltf_skinning/main.ow) example displays a real animated two-joint mesh with GPU vertex skinning. Press **Escape** to exit.
+The original GUI draws a built-in triangle. [`programmable_triangle`](examples/programmable_triangle/main.ow) compiles custom GLSL. [`textured_quad`](examples/textured_quad/main.ow) adds a two-triangle indexed quad with UVs, an RGBA8 texture and model matrix, all configured in OW. [`rotating_cube`](examples/rotating_cube/main.ow) adds a spinning, textured cube with lighting, perspective and actual depth testing. The [`model_viewer`](examples/model_viewer/main.ow) loads a local OBJ and adds left-mouse dragging, scroll zoom, arrow-key orbiting, and two directional lights plus one attenuated point light. The new [`material_scene`](examples/material_scene/main.ow) loads a real checkerboard PNG and renders two OBJ models in a parent-child hierarchy, with independent copper and azure Phong-style material settings. The [`gltf_instancing`](examples/gltf_instancing/main.ow) demo loads an embedded-buffer glTF model and uses two GPU draws for three animated/material-different instances with direct-light GGX metallic/roughness shading. The [`gltf_scene`](examples/gltf_scene/main.ow) example loads an actual binary GLB with three mesh primitives, glTF parent/child transforms and distinct per-primitive metallic/roughness values. The [`gltf_skinning`](examples/gltf_skinning/main.ow) example displays a real animated two-joint mesh with GPU vertex skinning. The [`animation_library`](examples/animation_library/main.ow) example plays two glTF clips with cubic Hermite movement, smooth crossfades and elapsed-time scheduling. Press **Escape** to exit.
 
 ## What is functional?
 
@@ -89,13 +90,14 @@ The original GUI draws a built-in triangle. [`programmable_triangle`](examples/p
 | Static glTF 2.0 embedded-buffer mesh + base color/metallic/roughness | First strict subset, no skinning |
 | Binary GLB, multiple meshes/primitives and static scene node transforms | First bounded implementation; Mesa framebuffer verified |
 | glTF skeletal skinning, LINEAR/STEP animation, quaternion SLERP | First bounded implementation; real GPU joint-palette deformation |
+| Up to 16 clips, CUBICSPLINE Hermite, TRS crossfade, monotonic animation clock | Implemented as separate typed OW/flOW modules |
 | GGX metallic-roughness direct-light shader | First implementation, not a full IBL PBR pipeline |
 | Translation keyframes and instanced GPU mat4 draws | Implemented; software framebuffer verified |
-| Multiple glTF animations/skins, CUBICSPLINE, morph targets, texture maps, shadow maps, full PBR IBL | Planned |
+| Multiple skins/meshes, animation blending trees, morph targets, texture maps, shadow maps, full PBR IBL | Planned |
 | Native OW AOT/FFI integration | Awaiting compiler support |
 | Lockfile | Committed and SHA-pinned |
 
-See [architecture](docs/ARCHITECTURE.md), [material and scene guide](docs/MATERIALS-AND-SCENES.md), [glTF and instancing guide](docs/GLTF-AND-INSTANCING.md), [GLB scene guide](docs/GLB-SCENES.md), [skeletal animation guide](docs/SKELETAL-ANIMATION.md), and [development commands](docs/DEVELOPMENT.md).
+See [architecture](docs/ARCHITECTURE.md), [material and scene guide](docs/MATERIALS-AND-SCENES.md), [glTF and instancing guide](docs/GLTF-AND-INSTANCING.md), [GLB scene guide](docs/GLB-SCENES.md), [skeletal animation guide](docs/SKELETAL-ANIMATION.md), [animation library guide](docs/ANIMATION-LIBRARY.md), and [development commands](docs/DEVELOPMENT.md).
 
 ## Ecosystem
 

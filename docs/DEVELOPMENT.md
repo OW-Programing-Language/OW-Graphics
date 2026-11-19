@@ -287,3 +287,29 @@ Bounded subset: one skin, one skinned mesh/primitive, one animation clip, up to 
 This is **real vertex skinning** in OpenGL 3.3, but not complete glTF 2.0 animation conformance: CUBICSPLINE interpolation, multiple animation clips/skins/meshes, GLB texture data, morphs, normalized integer weights, animation blending and physically correct skinned normal matrices for nonuniform scale are later features. The demo uses frame-based progression; a real elapsed-time scheduler is not part of this PR.
 
 Tests include JUnit for format validation, joint palettes/STEP/SLERP sampling, headless OW/flOW loading and Mesa/Xvfb GPU readback demonstrating that an animated vertex moves while the root-bound vertices remain fixed. See [Skeletal Animation](SKELETAL-ANIMATION.md).
+
+## 11. Phase 10 — multi-clip glTF animation libraries and smooth crossfades
+
+The new [`animation_library`](../examples/animation_library/main.ow) example contains two named clips inside the same original binary GLB: `Wave` (LINEAR translation/quaternion rotation + STEP scale) and `Bounce` (CUBICSPLINE translation and quaternion rotation). It runs a six-second sequence of Wave, a one-second crossfade to Bounce, Bounce and a one-second crossfade back. The transition weight and sampling timelines use actual monotonic elapsed seconds, independent of frame rate.
+
+```sh
+ow deps install
+ow check tests/animation_library.ow
+ow check examples/animation_library/main.ow
+mvn -f native-bridge/pom.xml test
+
+# Build native SPI + OW runtime as in previous sections, then run at repo root
+java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/ow-graphics-native-0.1.0-SNAPSHOT.jar:native-bridge/target/lib/*" dev.oreo.Main run examples/animation_library/main.ow
+```
+
+The `GRAPHICS_ANIMATION_LIBRARY` service offers `load_library(relativePath)`, `parse_library(gltfJson)`, `clip_duration(pack,index)`, `loop_time(pack,index,seconds)`, `sample_clip(pack,index,seconds)`, and `blend_clips(pack,sourceIndex,sourceTime,destIndex,destTime,weight)` where `weight` lies in 0..1.
+
+`load_library` returns `[rig14, clips, names, durationsSeconds]`. `rig14` is the original Phase 9 rig used unchanged for `GRAPHICS_MESH.create_skinned_indexed`. A CUBICSPLINE channel has 5 fields as before, but key values are stored as three component vectors `[inTangent,value,outTangent]` rather than one vector. The sampler applies cubic Hermite with tangents multiplied by the interval duration (as required by glTF), and quaternion outputs are normalized after Hermite. Crossfades blend node-local translations/scales linearly and rotations via shortest-arc quaternion SLERP; only **then** does it compute mesh-local joint palettes.
+
+`GRAPHICS_ANIMATION_CLOCK.now_seconds()` returns a monotonic time source; record a start time and compute `elapsed = clock.now_seconds() - start` each frame. Use `loop_time` only when cyclic playback is intended. Plain `sample_clip` still clamps to the nearest endpoint. No animation state is hidden inside the Java provider, and no timer/background task is created.
+
+The bounded first implementation supports one skinned mesh/skin, up to 16 animation clips, 32 channels per clip, 256 keys per channel, 32 joints, 64 nodes. It does not provide full glTF multi-skin scene animation, animation blend trees, animation events, root motion extraction, CUBICSPLINE tangents across clip loop boundaries, or texture/morph pipelines.
+
+The CI checks the original Phase 1–9 paths, JUnit animation parser/cubic/crossfade tests, OW/flOW CPU integration, plus actual OpenGL/Mesa pixel readbacks comparing Wave, Bounce and a GPU-rendered intermediate blended pose.
+
+See [Animation Library](ANIMATION-LIBRARY.md).

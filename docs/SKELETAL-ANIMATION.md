@@ -51,3 +51,7 @@ The module uses **linear blend skinning (LBS)**, not CPU deformation. Vertex pos
 - **Sampling:** input time is seconds; poses clamp to the first or last key. A future clock can implement proper delta-time playback, repeats and crossfades.
 
 CI tests actual Java CPU parser and animation math, real OW/flOW rig loading without a GPU, and **real Mesa OpenGL framebuffer pixels** to prove bone palette motion changes geometry on screen. The previous Phase 1–8 GPU/CPU suites remain active.
+
+## Phase 10 extension
+
+For multiple clips, glTF CUBICSPLINE interpolation and elapsed-time crossfades, use the separate `GRAPHICS_ANIMATION_LIBRARY` and `GRAPHICS_ANIMATION_CLOCK` modules. These are additive and preserve the original Phase 9 14-field rig API. See [Animation Library](ANIMATION-LIBRARY.md) for supported formats and the complete two-clip example.
