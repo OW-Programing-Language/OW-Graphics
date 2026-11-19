@@ -75,6 +75,11 @@ final class GltfSceneParser {
      * No unknown chunk types, silently ignored trailing bytes or network URIs.
      */
     static List<Object> parseGlb(byte[] bytes) {
+        return fromDocument(readGlb(bytes));
+    }
+
+    /** Shared GLB header/chunk validation for static scenes and animated rigs. */
+    static GltfModelParser.EmbeddedDocument readGlb(byte[] bytes) {
         if (bytes == null || bytes.length < 28 || bytes.length > MAX_GLB_BYTES
                 || (bytes.length & 3) != 0)
             throw new IllegalArgumentException("GLB container length must be bounded and 4-aligned");
@@ -97,7 +102,7 @@ final class GltfSceneParser {
         input.get(binary);
         // Official JSON chunks are space-padded. Gson permits whitespace after
         // the closing brace, but NUL padding is invalid and intentionally refused.
-        return fromDocument(GltfModelParser.document(new String(json,StandardCharsets.UTF_8),binary));
+        return GltfModelParser.document(new String(json,StandardCharsets.UTF_8),binary);
     }
 
     private static JsonObject object(JsonElement value,String label) {
