@@ -1,0 +1,8 @@
+# Deterministic transition rules: [fromClip, toClip, trigger, fadeSeconds].
+# fromClip -1 is a wildcard. First matching rule wins; rules must be
+# authored in priority order. No background updates or hidden callbacks.
+module_type GRAPHICS_ANIMATION_GRAPH:
+  include NATIVE_LIFECYCLE
+  fn initial(library array, clip int) -> array
+  fn advance(library array, state array, rules array, trigger string, deltaSeconds float) -> array
+  fn sample(library array, state array) -> array
