@@ -254,3 +254,36 @@ The current parser recognizes the active glTF scene, multiple mesh/primitive rec
 **Not implemented:** GLB buffer URIs or external buffer files, KHR extensions, full glTF material/texture maps, skins, morph targets, glTF animation-channel playback, non-triangle primitives, multiple BIN chunks, scene-level batching/occlusion or native Vulkan. The module rejects declared skins and animation tracks rather than pretending to render them.
 
 See [GLB Scenes](GLB-SCENES.md) for the module diagram, examples and current capabilities.
+
+## 10. Phase 9 — animated glTF 2.0 skeleton and GPU skinning
+
+The [animated two-joint example](../examples/gltf_skinning/main.ow) uses an original [binary GLB](../examples/gltf_skinning/assets/wave.glb) and the equivalent [JSON glTF](../examples/gltf_skinning/assets/wave.gltf) with two bones, a skinned quad mesh and three animation tracks. The left vertices are attached to the root, while the right vertices are attached to the moving/rotating child joint. GPU vertex skinning is performed in GLSL using uniform `mat4 uBones[32]`.
+
+```bash
+ow deps install
+ow check tests/gltf_skinning.ow
+ow check examples/gltf_skinning/main.ow
+mvn -f native-bridge/pom.xml test
+# With native OpenGL provider on the classpath, run from OW-Graphics root:
+java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/ow-graphics-native-0.1.0-SNAPSHOT.jar:native-bridge/target/lib/*" dev.oreo.Main run examples/gltf_skinning/main.ow
+```
+
+`GRAPHICS_GLTF_SKIN.load_rig(path)` accepts project-relative `.gltf`/ `.glb` files; `parse_rig(gltfJson)` accepts the embedded data-URI JSON format. These return a 14-field OW array:
+
+```text
+[
+ positionsXYZ, uvs, normalsXYZ, triangleIndices,
+ jointIds4PerVertex, weights4PerVertex,
+ nodeParents, nodeBindTranslations, nodeBindRotations, nodeBindScales,
+ skinJointNodeIds, inverseBindMatrices,
+ animationChannels, meshNodeId
+]
+```
+
+Use `sample_palette(rig, timeInSeconds)` to produce a 1..32-element array of OpenGL column-major joint matrices, then `GRAPHICS_SHADER.set_mat4_array(program, "uBones", palette)`. Create geometry once with `GRAPHICS_MESH.create_skinned_indexed(positions,uvs,normals,indices,joints,weights)` and draw normally. The skinned vertex shader binds joints at **location 7**, weights at **location 8**, leaving locations 0/1/2 and instance locations 3–6 unchanged.
+
+Bounded subset: one skin, one skinned mesh/primitive, one animation clip, up to 64 nodes, 32 skin joints, 32 animation channels and 256 keyframes per channel; only JOINTS_0 as UBYTE/USHORT VEC4 and WEIGHTS_0 as FLOAT VEC4, plus FLOAT node translation/rotation/scale keyframes. LINEAR interpolation and STEP are supported; quaternion LINEAR uses spherical interpolation with shortest-path normalization. Unknown required extensions, paths outside the working directory, invalid weights, unsupported interpolation and missing/out-of-range joint references are rejected.
+
+This is **real vertex skinning** in OpenGL 3.3, but not complete glTF 2.0 animation conformance: CUBICSPLINE interpolation, multiple animation clips/skins/meshes, GLB texture data, morphs, normalized integer weights, animation blending and physically correct skinned normal matrices for nonuniform scale are later features. The demo uses frame-based progression; a real elapsed-time scheduler is not part of this PR.
+
+Tests include JUnit for format validation, joint palettes/STEP/SLERP sampling, headless OW/flOW loading and Mesa/Xvfb GPU readback demonstrating that an animated vertex moves while the root-bound vertices remain fixed. See [Skeletal Animation](SKELETAL-ANIMATION.md).
