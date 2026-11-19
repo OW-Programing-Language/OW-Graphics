@@ -42,6 +42,14 @@ A CPU-only `GltfModelParser` uses bounded JSON and base64 buffers to decode a do
 
 `GRAPHICS_MESH.draw_instanced(handle, modelMatrices)` validates 1–512 column-major transforms then uploads a dynamic GPU mat4 buffer for **one actual glDrawElementsInstanced call**. Each mesh owns its reusable instance VBO, deleted on mesh destruction or context teardown. The shader must declare a `mat4` at vertex attribute location 3 (occupies 3–6); older shaders and single-object draws are unchanged.
 
+## Phase 8: static glTF/GLB scene decoder
+
+The CPU-only `GltfSceneParser` shares the bounded accessor and material parser from Phase 7. It reads an embedded-buffer JSON glTF or **binary GLB 2.0** (one JSON chunk, one BIN chunk), and extracts up to 64 mesh primitives across 64 meshes.
+
+The decoder visits selected scene roots depth-first and returns **parent-first ordered** arrays of local 4x4 matrices and mesh-primitive references. It honors glTF node `matrix` or translation/rotation-quaternion/scale (TRS), rejects cycles or shared children, and limits source scenes to 1024 nodes. The existing `MakeSceneGraph(Transforms)` functor composes those matrices entirely in OW. All GPU upload/draw/destruction remains in the previously implemented `GRAPHICS_MESH`, `GRAPHICS_SHADER`, `GRAPHICS_TEXTURE` and renderer contracts.
+
+No skeletons, skins, glTF animation channels, morph targets, KHR extensions, external buffer URLs or auto-generated shader material maps are claimed.
+
 ## Lifecycle
 
 `App.boot()` registers all modules, checks contracts and orders startup. `App.stop()` tears down in reverse order. Window creation is explicitly deferred until after boot; this keeps contract checking and non-GPU tests safe. OpenGL resources are released in `graphics.window.close`; opening a new window rebuilds them.
@@ -62,6 +70,7 @@ The extension holds a scoped resource registry per interpreter and context, with
 7a. [x] Phase 5: native GLFW cursor and named inputs, pure OW orbit controller functor, two directional + point lights, sandboxed Wavefront OBJ import
 7b. [x] Phase 6: bounded PNG/JPEG loader, typed material library, scene graph and multi-object renderer
 7c. [x] Phase 7: restricted static embedded glTF, direct-light metallic/roughness, translation keyframes, GPU instancing
+7d. [x] Phase 8: binary GLB, multiple static meshes/primitives and node transforms across scenes
 8. [ ] MTL/PBR IBL materials, glTF external assets/GLB, skeleton/skin animation, shadow maps, GPU culling
 9. [ ] Native C ABI / compiler-level FFI after ow-lang supports a stable general-purpose interface
 10. [ ] Windows/macOS physical GPU smoke tests and broader graphics-driver compatibility

@@ -24,6 +24,8 @@ Run `examples/gltf_instancing/main.ow` with the compiled OW runtime + Java SPI/L
 
 The demo draws two gold instances together, then one independent glTF-material instance. The middle object moves vertically using linear OW keyframes. A conventional PNG texture is loaded using the Phase 6 texture loader, not through embedded glTF images.
 
+Phase 8 adds a **separate** `GRAPHICS_GLTF_SCENE` module for multi-mesh static scenes and binary GLB files. The original `GRAPHICS_GLTF_MODEL` entry point remains backward compatible with its first-primitive subset. See [GLB Scenes](GLB-SCENES.md).
+
 ## Supported and unsupported features
 
 | Feature | Supported |

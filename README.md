@@ -2,7 +2,7 @@
 
 **A modular graphics toolkit for the OW programming language, built with flOW.**
 
-OW Graphics provides typed OW modules for windows, input, rendering and scene composition. The first backend targets **OpenGL 3.3** through an installable Java runtime extension using **LWJGL + native GLFW/OpenGL libraries**. Applications can supply their own GLSL shaders, meshes, vec4/sampler/mat4 uniforms, RGBA8 textures, indexed geometry, **perspective cameras**, **depth testing** and **diffuse lighting**, interactive orbit-camera input, a three-light rig, bounded Wavefront OBJ model importing, **PNG/JPEG texture loading**, per-object materials, a hierarchical scene graph, static **glTF 2.0** importing, direct-light **GGX metallic-roughness**, translation keyframes and GPU instancing. A headless renderer exercises the same typed contracts without native libraries.
+OW Graphics provides typed OW modules for windows, input, rendering and scene composition. The first backend targets **OpenGL 3.3** through an installable Java runtime extension using **LWJGL + native GLFW/OpenGL libraries**. Applications can supply their own GLSL shaders, meshes, vec4/sampler/mat4 uniforms, RGBA8 textures, indexed geometry, **perspective cameras**, **depth testing** and **diffuse lighting**, interactive orbit-camera input, a three-light rig, bounded Wavefront OBJ model importing, **PNG/JPEG texture loading**, per-object materials, a hierarchical scene graph, static **glTF 2.0** importing, direct-light **GGX metallic-roughness**, translation keyframes, GPU instancing, and **GLB/multi-mesh static scenes with parent-child transforms**. A headless renderer exercises the same typed contracts without native libraries.
 
 > **Status: early development (v0.1 foundation).** This is not a complete graphics engine. Vulkan, production shader/texture APIs, native AOT output and cross-platform GUI tests are planned rather than claimed as complete.
 
@@ -26,7 +26,7 @@ src/graphics/
   camera/{api,infra}/             # perspective, look-at and typed orbit functor
   geometry/{api,infra}/           # reusable six-face cube geometry
   lighting/{api,infra}/           # daylight and studio multi-light presets
-  model/{api,infra}/              # bounded Wavefront OBJ + glTF 2.0 import
+  model/{api,infra}/              # bounded Wavefront OBJ, glTF 2.0 + GLB scenes
   material/{api,infra}/           # pure OW Phong and metallic-roughness presets
   animation/{api,infra}/          # pure OW keyframe interpolation
 native-bridge/                     # Maven Java RuntimeExtension + LWJGL natives
@@ -38,6 +38,7 @@ examples/rotating_cube/           # actual 3D depth and lit textured cube
 examples/model_viewer/            # local OBJ, orbit camera, 3 light sources
 examples/material_scene/          # real PNG, 2 material instances and 2 hierarchy nodes
 examples/gltf_instancing/         # glTF mesh, GGX shading, animation, GPU instancing
+examples/gltf_scene/              # binary GLB, multiple meshes/materials + scene nodes
 docs/{ARCHITECTURE,DEVELOPMENT}.md
 ```
 
@@ -55,6 +56,7 @@ ow run tests/headless_orbit.ow
 ow run tests/headless_material_scene.ow
 ow run tests/headless_multiscene.ow
 ow run tests/headless_pbr_animation.ow
+# The GLB parser test requires the built Java SPI provider.
 ```
 
 The test registers a scene **before** its renderer, checks flOW boot ordering, retrieves typed services, renders via a headless backend and tests protection against disabling a required service.
@@ -63,7 +65,7 @@ The test registers a scene **before** its renderer, checks flOW boot ordering, r
 
 Build the extension against a sibling checkout of `ow-lang` and then launch the OW interpreter with the provider on the Java classpath. Complete commands (Linux/macOS and Windows): **[Development guide](docs/DEVELOPMENT.md)**.
 
-The original GUI draws a built-in triangle. [`programmable_triangle`](examples/programmable_triangle/main.ow) compiles custom GLSL. [`textured_quad`](examples/textured_quad/main.ow) adds a two-triangle indexed quad with UVs, an RGBA8 texture and model matrix, all configured in OW. [`rotating_cube`](examples/rotating_cube/main.ow) adds a spinning, textured cube with lighting, perspective and actual depth testing. The [`model_viewer`](examples/model_viewer/main.ow) loads a local OBJ and adds left-mouse dragging, scroll zoom, arrow-key orbiting, and two directional lights plus one attenuated point light. The new [`material_scene`](examples/material_scene/main.ow) loads a real checkerboard PNG and renders two OBJ models in a parent-child hierarchy, with independent copper and azure Phong-style material settings. The [`gltf_instancing`](examples/gltf_instancing/main.ow) demo loads an embedded-buffer glTF model and uses two GPU draws for three animated/material-different instances with direct-light GGX metallic/roughness shading. Press **Escape** to exit.
+The original GUI draws a built-in triangle. [`programmable_triangle`](examples/programmable_triangle/main.ow) compiles custom GLSL. [`textured_quad`](examples/textured_quad/main.ow) adds a two-triangle indexed quad with UVs, an RGBA8 texture and model matrix, all configured in OW. [`rotating_cube`](examples/rotating_cube/main.ow) adds a spinning, textured cube with lighting, perspective and actual depth testing. The [`model_viewer`](examples/model_viewer/main.ow) loads a local OBJ and adds left-mouse dragging, scroll zoom, arrow-key orbiting, and two directional lights plus one attenuated point light. The new [`material_scene`](examples/material_scene/main.ow) loads a real checkerboard PNG and renders two OBJ models in a parent-child hierarchy, with independent copper and azure Phong-style material settings. The [`gltf_instancing`](examples/gltf_instancing/main.ow) demo loads an embedded-buffer glTF model and uses two GPU draws for three animated/material-different instances with direct-light GGX metallic/roughness shading. The [`gltf_scene`](examples/gltf_scene/main.ow) example loads an actual binary GLB with three mesh primitives, glTF parent/child transforms and distinct per-primitive metallic/roughness values. Press **Escape** to exit.
 
 ## What is functional?
 
@@ -83,14 +85,15 @@ The original GUI draws a built-in triangle. [`programmable_triangle`](examples/p
 | PNG/JPEG texture import (ImageIO, RGBA8) | Implemented, local-only and bounded |
 | Material presets (tint, diffuse, specular, shininess) | Implemented in pure OW, per-object uniforms |
 | Parent-child scene graph + multiple draws per frame | Implemented as typed flOW functors |
-| Static glTF 2.0 embedded-buffer mesh + base color/metallic/roughness | First strict subset, no GLB or skinning |
+| Static glTF 2.0 embedded-buffer mesh + base color/metallic/roughness | First strict subset, no skinning |
+| Binary GLB, multiple meshes/primitives and static scene node transforms | First bounded implementation; Mesa framebuffer verified |
 | GGX metallic-roughness direct-light shader | First implementation, not a full IBL PBR pipeline |
 | Translation keyframes and instanced GPU mat4 draws | Implemented; software framebuffer verified |
 | MTL parsing, glTF animations/skins, shadow maps and full PBR IBL | Planned |
 | Native OW AOT/FFI integration | Awaiting compiler support |
 | Lockfile | Committed and SHA-pinned |
 
-See [architecture](docs/ARCHITECTURE.md), [material and scene guide](docs/MATERIALS-AND-SCENES.md), [glTF and instancing guide](docs/GLTF-AND-INSTANCING.md), and [development commands](docs/DEVELOPMENT.md).
+See [architecture](docs/ARCHITECTURE.md), [material and scene guide](docs/MATERIALS-AND-SCENES.md), [glTF and instancing guide](docs/GLTF-AND-INSTANCING.md), [GLB scene guide](docs/GLB-SCENES.md), and [development commands](docs/DEVELOPMENT.md).
 
 ## Ecosystem
 

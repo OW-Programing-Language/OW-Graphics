@@ -221,3 +221,36 @@ It **does not yet support** external buffers, GLB, multiple meshes/primitives, g
 The PBR-inspired GLSL sample implements **direct-light GGX normal distribution, Schlick Fresnel, Smith geometry and metallic/roughness** with tone mapping. It is a deliberately restricted shading demonstration without image-based lighting, HDR environment maps, shadow maps, color-managed texture pipelines or glTF material texture maps.
 
 Verification includes static glTF CPU parser validation and sandbox tests, OW/flOW keyframes/PBR contract tests, real GPU framebuffer proof of two instances, and full OW→flOW→GLFW→OpenGL instanced example. See [glTF & Instancing](GLTF-AND-INSTANCING.md).
+
+## 9. Phase 8 — static multi-mesh scenes in GLB and glTF
+
+The [GLB scene example](../examples/gltf_scene/main.ow) loads an original, small `multi_scene.glb` binary and its equivalent `multi_scene.gltf` JSON asset. The files contain two mesh definitions, three primitives, three PBR color/factor settings and four scene nodes. Parent/child transforms are composed by the **pure OW scene graph**, not a new Java renderer.
+
+```sh
+ow deps install
+ow check tests/headless_gltf_scene.ow
+ow check examples/gltf_scene/main.ow
+
+# After building the OW runtime and native-bridge:
+java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/ow-graphics-native-0.1.0-SNAPSHOT.jar:native-bridge/target/lib/*" dev.oreo.Main run tests/headless_gltf_scene.ow
+java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/ow-graphics-native-0.1.0-SNAPSHOT.jar:native-bridge/target/lib/*" dev.oreo.Main run examples/gltf_scene/main.ow
+```
+
+The new `GRAPHICS_GLTF_SCENE` service exposes `load_scene(relativePath)` for `.gltf` / `.glb`, and `parse_scene(jsonSource)` for JSON. It returns:
+
+```text
+[
+  primitiveMeshes,    # array of Phase-7 7-field geometry/material arrays
+  parentIndices,      # parent-first, -1 = root
+  localMatrices,      # 16-float OpenGL column-major matrices
+  nodePrimitiveIds    # 0..N primitive indexes per node
+]
+```
+
+Use `GRAPHICS_SCENE_GRAPH.resolve(parentIndices,localMatrices)` for world transforms, upload **each unique primitive once** with `GRAPHICS_MESH.create_lit_indexed`, and draw its handle from each visible node. This lets multiple nodes reuse the same mesh resource.
+
+The current parser recognizes the active glTF scene, multiple mesh/primitive records, and TRS with quaternion rotation as well as explicit node matrices. Format limits: 1 MiB JSON, 4 MiB BIN data, 64 mesh definitions, 64 primitives total, 1024 nodes and 32 scenes. Only the existing static TRIANGLES accessor subset, one embedded data URI or a GLB BIN chunk is supported. GLB chunks are explicitly validated with version, magic, length and padding; filenames remain sandboxed under the working directory.
+
+**Not implemented:** GLB buffer URIs or external buffer files, KHR extensions, full glTF material/texture maps, skins, morph targets, glTF animation-channel playback, non-triangle primitives, multiple BIN chunks, scene-level batching/occlusion or native Vulkan. The module rejects declared skins and animation tracks rather than pretending to render them.
+
+See [GLB Scenes](GLB-SCENES.md) for the module diagram, examples and current capabilities.
