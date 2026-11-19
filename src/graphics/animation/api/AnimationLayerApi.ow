@@ -1,0 +1,6 @@
+# Additive clip overlay applied on selected node IDs.
+# Deltas are computed against the overlay clip at referenceSeconds.
+# Empty mask yields the original base pose. Returns a standard joint palette.
+module_type GRAPHICS_ANIMATION_LAYER:
+  include NATIVE_LIFECYCLE
+  fn additive(library array, baseClip int, baseSeconds float, layerClip int, layerSeconds float, referenceSeconds float, weight float, nodeMask array) -> array

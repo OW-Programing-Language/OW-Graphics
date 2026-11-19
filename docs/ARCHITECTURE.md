@@ -68,6 +68,14 @@ The `GltfSkinParser` keeps the Phase 9 **14-field rig** contract intact while de
 
 The new modules are additive: existing `GRAPHICS_GLTF_SKIN.load_rig`, `sample_palette` and `GRAPHICS_MESH.create_skinned_indexed` continue to work unchanged.
 
+## Phase 11: deterministic OW animation controller and bounded CPU services
+
+`MakeAnimationStateMachine(GltfAnimationLibrary)` is a **pure OW/flOW functor**. State is the explicitly owned six-field array `[currentClip,currentSeconds,sourceClip,sourceSeconds,fadeSeconds,fadeDuration]`. The `tick` method receives a monotonic delta and requested target, and `sample` uses the Phase 10 library's local-TRS crossfade. Mid-transition requests are deferred until the active fade finishes. The module never mutates the native JVM provider or opens a window.
+
+`GRAPHICS_ANIMATION_LAYER` implements selective **node-masked additive skeletal animation**: sampled overlay TRS minus an overlay reference pose, with translation differences, scale ratios and quaternion rotation deltas applied to the base pose. The final joint palette is computed *after* layering, preserving the Phase 9 GPU format and vertex shader.
+
+`GRAPHICS_ANIMATION_TIMELINE` is a CPU-only, **polling-based** service for authored marker events and optional selected-node local root-motion deltas. Events are **not** standardized glTF extras and do not automatically invoke callbacks or mutate the game state. Root-motion extraction returns one node's local `xyz` displacement including loop crossings; the game must decide how to apply it to its character transform. Methods cap query size/cycles and validate node/clip indices.
+
 ## Lifecycle
 
 `App.boot()` registers all modules, checks contracts and orders startup. `App.stop()` tears down in reverse order. Window creation is explicitly deferred until after boot; this keeps contract checking and non-GPU tests safe. OpenGL resources are released in `graphics.window.close`; opening a new window rebuilds them.
@@ -91,6 +99,7 @@ The extension holds a scoped resource registry per interpreter and context, with
 7d. [x] Phase 8: binary GLB, multiple static meshes/primitives and node transforms across scenes
 7e. [x] Phase 9: one bounded glTF skeletal rig, animated TRS sampler and real GPU linear-blend skinning
 7f. [x] Phase 10: up to 16 clips, CUBICSPLINE Hermite, local TRS crossfade, monotonic-time playback
+7g. [x] Phase 11: pure OW state machine, additive skeletal layers, authored markers and local root-motion deltas
 8. [ ] MTL/PBR IBL materials, glTF external assets, multi-skin scene animation, shadows and GPU culling
 9. [ ] Native C ABI / compiler-level FFI after ow-lang supports a stable general-purpose interface
 10. [ ] Windows/macOS physical GPU smoke tests and broader graphics-driver compatibility

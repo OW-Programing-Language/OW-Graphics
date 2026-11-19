@@ -667,4 +667,152 @@ final class GltfSkinParser {
         return palette(rig,new Pose(t,r,s));
     }
 
+    /** glTF uses xyzw unit quaternions. Do not blend skinned matrices directly. */
+    private static double[] quaternionMultiply(double[] a,double[] b) {
+        double x=a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1];
+        double y=a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0];
+        double z=a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3];
+        double w=a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2];
+        return normalizeQuaternion(List.of(x,y,z,w));
+    }
+
+    /**
+     * Add the difference between an overlay clip and its reference pose onto
+     * a base clip, restricted to explicit glTF node IDs. Translations are
+     * additive, scales multiplicative relative to reference, rotations use
+     * quaternion multiplication and weighted SLERP from identity.
+     *
+     * The rig's mesh-local bone palette is computed ONLY after TRS layering.
+     */
+    static List<Object> additiveClips(List<?> lib,int baseClip,double baseTime,
+                                      int layerClip,double layerTime,double referenceTime,
+                                      double weight,List<?> mask) {
+        finite(weight,"additive weight");
+        if(weight<0||weight>1)
+            throw new IllegalArgumentException("Additive weight must be [0,1]");
+        Pose base=pose(rigClip(lib,baseClip),baseTime);
+        Pose layer=pose(rigClip(lib,layerClip),layerTime);
+        Pose reference=pose(rigClip(lib,layerClip),referenceTime);
+        int size=base.translations().size();
+        if(mask==null||mask.size()>size)
+            throw new IllegalArgumentException("Node mask must be a bounded array");
+        boolean[] selected=new boolean[size];
+        for(Object entry:mask) {
+            double raw=num(entry);
+            if(raw!=Math.rint(raw)||raw<0||raw>=size)
+                throw new IllegalArgumentException("Additive mask index out of range");
+            int id=(int)raw;
+            if(selected[id])throw new IllegalArgumentException("Additive mask contains duplicate nodes");
+            selected[id]=true;
+        }
+        List<double[]> translations=new ArrayList<>(size);
+        List<double[]> rotations=new ArrayList<>(size);
+        List<double[]> scales=new ArrayList<>(size);
+        for(int i=0;i<size;i++) {
+            double[] bt=base.translations().get(i),br=base.rotations().get(i),
+                    bs=base.scales().get(i);
+            if(!selected[i]||weight==0) {
+                translations.add(bt);rotations.add(br);scales.add(bs);
+                continue;
+            }
+            double[] lt=layer.translations().get(i),lr=layer.rotations().get(i),
+                    ls=layer.scales().get(i),rt=reference.translations().get(i),
+                    rr=reference.rotations().get(i),rs=reference.scales().get(i);
+            double[] targetT=new double[3],targetS=new double[3];
+            for(int c=0;c<3;c++) {
+                targetT[c]=finite(bt[c]+weight*(lt[c]-rt[c]),"additive translation");
+                if(Math.abs(rs[c])<1e-9)
+                    throw new IllegalArgumentException("Reference scale must be invertible");
+                targetS[c]=finite(bs[c]*(1+weight*(ls[c]/rs[c]-1)),"additive scale");
+            }
+            double[] inverseReference={-rr[0],-rr[1],-rr[2],rr[3]};
+            double[] delta=quaternionMultiply(lr,inverseReference);
+            double[] weighted=slerp(new double[]{0,0,0,1},delta,weight);
+            translations.add(targetT);
+            scales.add(targetS);
+            rotations.add(quaternionMultiply(br,weighted));
+        }
+        return palette(library(lib),new Pose(translations,rotations,scales));
+    }
+
+    /**
+     * Displacement in the selected node's LOCAL translation, including cycle
+     * crossings. This is a motion-extraction API, not automatic character
+     * movement or a full world-space root-motion integrator.
+     */
+    static List<Double> rootDelta(List<?> lib,int clipId,int node,
+                                  double previous,double current) {
+        finite(previous,"previous root-motion time");
+        finite(current,"current root-motion time");
+        if(previous<0||current<previous||current-previous>3600)
+            throw new IllegalArgumentException("Root-motion times must be ordered, range <=3600s");
+        List<?> rig=rigClip(lib,clipId);
+        int size=requiredList(rig.get(6),"nodes",MAX_NODES).size();
+        if(node<0||node>=size)
+            throw new IllegalArgumentException("Root-motion node out of range");
+        double duration=clipDuration(lib,clipId);
+        if(duration==0)return List.of(0.0,0.0,0.0);
+        double cycles=Math.floor(current/duration)-Math.floor(previous/duration);
+        if(cycles>10000)
+            throw new IllegalArgumentException("Too many animation cycles in one query");
+        double[] start=pose(rig,loopTime(lib,clipId,previous)).translations().get(node);
+        double[] end=pose(rig,loopTime(lib,clipId,current)).translations().get(node);
+        double[] zero=pose(rig,0).translations().get(node);
+        double[] finalValue=pose(rig,duration).translations().get(node);
+        List<Double> delta=new ArrayList<>(3);
+        for(int i=0;i<3;i++)
+            delta.add(finite(end[i]-start[i]+cycles*(finalValue[i]-zero[i]),
+                    "root-motion displacement"));
+        return delta;
+    }
+
+    /**
+     * User-authored animation markers (NOT a standard glTF event extension):
+     * [clipIndex, localSeconds, eventName]. Return [name, absoluteTime, markerTime]
+     * for occurrences in the half-open (previous, current] time interval.
+     * Traverses a bounded number of loops, never emits network/event callbacks.
+     */
+    static List<Object> eventsBetween(List<?> lib,int clipId,List<?> markers,
+                                      double previous,double current) {
+        finite(previous,"previous event time");
+        finite(current,"current event time");
+        if(previous<0||current<previous||current-previous>3600)
+            throw new IllegalArgumentException("Event query requires ordered bounded times");
+        if(markers==null||markers.size()>128)
+            throw new IllegalArgumentException("Markers must contain <=128 entries");
+        double duration=clipDuration(lib,clipId);
+        if(duration<=0)return List.of();
+        double fromCycle=Math.floor(previous/duration);
+        double toCycle=Math.floor(current/duration);
+        if(toCycle-fromCycle>128)
+            throw new IllegalArgumentException("Event scan crossed too many animation cycles");
+        List<Object> events=new ArrayList<>();
+        // Source order is stable per loop; callers can use the returned times
+        // to sort different markers if they need globally chronological order.
+        for(double cycle=fromCycle;cycle<=toCycle;cycle++) {
+            for(Object item:markers) {
+                List<?> marker=requiredList(item,"animation marker",3);
+                if(marker.size()!=3)
+                    throw new IllegalArgumentException("Marker must have clip, seconds, name");
+                double idValue=num(marker.get(0));
+                if(idValue!=Math.rint(idValue)||idValue<0||idValue>=
+                        requiredList(lib.get(1),"clips",MAX_CLIPS).size())
+                    throw new IllegalArgumentException("Marker clip index invalid");
+                double at=num(marker.get(1));
+                if(at<0||at>clipDuration(lib,(int)idValue))
+                    throw new IllegalArgumentException("Marker must be within the clip duration");
+                if(!(marker.get(2) instanceof String name)||name.isBlank()||name.length()>128)
+                    throw new IllegalArgumentException("Marker event name must be 1..128 characters");
+                if((int)idValue!=clipId)continue;
+                double absolute=cycle*duration+at;
+                if(absolute>previous && absolute<=current) {
+                    if(events.size()>=128)
+                        throw new IllegalArgumentException("Too many animation events in one query");
+                    events.add(List.of(name,absolute,at));
+                }
+            }
+        }
+        return events;
+    }
+
 }

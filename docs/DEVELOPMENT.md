@@ -313,3 +313,28 @@ The bounded first implementation supports one skinned mesh/skin, up to 16 animat
 The CI checks the original Phase 1–9 paths, JUnit animation parser/cubic/crossfade tests, OW/flOW CPU integration, plus actual OpenGL/Mesa pixel readbacks comparing Wave, Bounce and a GPU-rendered intermediate blended pose.
 
 See [Animation Library](ANIMATION-LIBRARY.md).
+
+## 12. Phase 11 — animation state machines, additive overlays, events and root motion
+
+[The animation controller](../examples/animation_controller/main.ow) uses the original `three_clips.glb` (also available as `.gltf`), containing three clips: Wave, Bounce and Walk. Walk adds an independently animated root-joint translation for loop-aware root-motion extraction. The demo schedules deterministic state transitions in pure OW/flOW, blends an upper-body Wave layer onto Walk and polls user-defined footstep markers.
+
+```sh
+ow deps install
+ow check tests/animation_controller.ow
+ow check examples/animation_controller/main.ow
+mvn -f native-bridge/pom.xml test
+# After installing the native SPI provider and OW runtime:
+java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/ow-graphics-native-0.1.0-SNAPSHOT.jar:native-bridge/target/lib/*" dev.oreo.Main run examples/animation_controller/main.ow
+```
+
+`GRAPHICS_ANIMATION_STATE_MACHINE` is a pure OW functor `MakeAnimationStateMachine(GltfAnimationLibrary)`: `initial(library,clip)`, `tick(library,state,desiredClip,deltaSeconds,fadeDuration)`, `sample(library,state)`. Its six-field state is explicitly owned by the caller. Transitions are non-interruptible in this first implementation. `tick` accepts nonnegative delta/fade durations up to 60 seconds; active clips loop through the existing `GRAPHICS_ANIMATION_LIBRARY.loop_time` operation. The caller should use the monotonic clock to calculate `deltaSeconds`.
+
+`GRAPHICS_ANIMATION_LAYER.additive(lib,baseClip,baseTime,overlayClip,overlayTime,referenceTime,weight,nodeMask)` returns a normal joint palette. An empty mask or weight 0 leaves the base pose unchanged. For selected nodes, the overlay's translation delta, scale ratio and quaternion rotation delta are calculated against the overlay clip at `referenceTime`. Weight must lie in `[0,1]`, and node IDs must be distinct and valid. This is a simple one-layer masked additive animation, not a general blend tree.
+
+`GRAPHICS_ANIMATION_TIMELINE.events_between(lib,clip,markers,previousSeconds,currentSeconds)` returns `[eventName,absoluteSeconds,markerLocalSeconds]` for marker occurrences in `(previousSeconds,currentSeconds]`, traversing bounded loop crossings. Markers are **authored by the OW application**, not derived automatically from glTF's standard animation format. Each marker is `[clipIndex,localSeconds,eventName]`; the returned events are ordered by cycle then source marker order (not globally time sorted within a cycle). Clients can apply game effects or sort by absolute timestamp. The API only returns values; it never dispatches callbacks or network notifications.
+
+`GRAPHICS_ANIMATION_TIMELINE.root_delta(lib,clip,node,previousSeconds,currentSeconds)` returns a three-value **node-local translation delta**, accumulated across loop boundaries. It does not automatically move the model, cancel root motion in the skeleton, or solve world-space trajectories; the game must decide how to apply it. To avoid double application, do not add the delta to a character position while also treating its root-bone translation as full object motion without compensating.
+
+The first implementation retains Phase 10 limits (16 clips, one skinned mesh and skin, up to 32 joints, 64 nodes), and adds bounded event scans (128 markers and 128 fired events, max 128 crossed cycles). No layered masks from a visual editor, state graph conditions, IK, retargeting, foot locking, motion matching or native Vulkan.
+
+CI runs JUnit state/layer/timeline and boundary cases, actual OW/flOW source type-checks and headless execution, a GPU Mesa smoke proving the additive layer changes pixels and the Walk root moves the skinned mesh, and full OW→OpenGL smoke for the controller.

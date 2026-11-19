@@ -1,0 +1,8 @@
+# Stateless deterministic controller. The OW caller owns its six-field state:
+# [activeClip, activeElapsed, oldClipOrMinusOne, oldElapsed, fadeElapsed, fadeDuration].
+# Request new clips through tick; pending crossfades cannot be interrupted.
+module_type GRAPHICS_ANIMATION_STATE_MACHINE:
+  include NATIVE_LIFECYCLE
+  fn initial(library array, clip int) -> array
+  fn tick(library array, state array, desiredClip int, deltaSeconds float, fadeSeconds float) -> array
+  fn sample(library array, state array) -> array
