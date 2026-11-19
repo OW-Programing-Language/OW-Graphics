@@ -148,6 +148,50 @@ final class GraphicsArguments {
         return new LitGeometry(geometry, normals);
     }
 
+    /** Skinning layout: 8 base floats + four joint IDs + four vertex weights. */
+    record SkinnedGeometry(LitGeometry lit, float[] joints, float[] weights) {}
+
+    static SkinnedGeometry skinnedGeometry(Object positions,Object uvs,Object normals,
+                                           Object indices,Object ids,Object weightsSource) {
+        LitGeometry lit=litGeometry(positions,uvs,normals,indices);
+        int vertices=lit.base().positions().length/3;
+        if(!(ids instanceof List<?> jointValues) || jointValues.size()!=vertices*4)
+            throw new IllegalArgumentException("Joint IDs must have four values per vertex");
+        if(!(weightsSource instanceof List<?> weightValues) || weightValues.size()!=vertices*4)
+            throw new IllegalArgumentException("Weights must have four values per vertex");
+        float[] joints=new float[vertices*4];
+        float[] weights=new float[vertices*4];
+        for(int i=0;i<vertices;i++) {
+            float sum=0;
+            for(int component=0;component<4;component++) {
+                int at=i*4+component;
+                int id=integer(jointValues.get(at),"joint index");
+                if(id<0 || id>=32)
+                    throw new IllegalArgumentException("Skinned vertex joint index must be 0..31");
+                joints[at]=id;
+                float weight=finiteFloat(weightValues.get(at),"joint weight");
+                if(weight<0 || weight>1)
+                    throw new IllegalArgumentException("Skin weights must be within [0,1]");
+                weights[at]=weight;
+                sum+=weight;
+            }
+            if(!Float.isFinite(sum)||Math.abs(sum-1.0f)>0.001f)
+                throw new IllegalArgumentException("Four skinning weights must sum to one");
+            for(int c=0;c<4;c++)weights[i*4+c]/=sum;
+        }
+        return new SkinnedGeometry(lit,joints,weights);
+    }
+
+    /** A uniform mat4 palette of 1..32 finite column-major joint transforms. */
+    static float[] jointMatrices(Object source) {
+        if(!(source instanceof List<?> matrices) || matrices.isEmpty() || matrices.size()>32)
+            throw new IllegalArgumentException("Joint palette must contain 1..32 mat4 values");
+        float[] result=new float[matrices.size()*16];
+        for(int i=0;i<matrices.size();i++)
+            System.arraycopy(matrix4(matrices.get(i)),0,result,i*16,16);
+        return result;
+    }
+
     /** Dense per-instance 4x4 column-major transforms, maximum 512 instances. */
     static float[] instanceMatrices(Object source) {
         if (!(source instanceof List<?> matrices) || matrices.isEmpty() || matrices.size() > 512)
