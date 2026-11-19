@@ -1,0 +1,306 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "OW Graphics phase 10 multi-clip + cubic Hermite original fixture"
+  },
+  "buffers": [
+    {
+      "byteLength": 604,
+      "uri": "data:application/octet-stream;base64,mpkZv5qZGb8AAAAAmpkZP5qZGb8AAAAAmpkZP83MzD0AAAAAmpkZv83MzD0AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAgD8AAIA/AAAAAAAAgD8AAAEAAgACAAMAAAAAAAAAAQAAAAEAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAIA/AAAAAAAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAgD8AAAAAAAAAAAAAAAAAAAAAzcwMPwAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAADug4Q+6kZ3PwAAgD8AAIA/AACAP83MjD8AAIA/AACAPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACamZm/AAAAAAAAAAAAAAAAAAAAAAAAAADNzMy+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAAC/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABXvw75eg2w/AAAAAAAAAAAAAAAAAAAAAA=="
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 48
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 48,
+      "byteLength": 48
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 96,
+      "byteLength": 32
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 128,
+      "byteLength": 12
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 140,
+      "byteLength": 16
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 156,
+      "byteLength": 64
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 220,
+      "byteLength": 128
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 348,
+      "byteLength": 8
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 356,
+      "byteLength": 24
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 380,
+      "byteLength": 32
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 412,
+      "byteLength": 24
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 436,
+      "byteLength": 72,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 508,
+      "byteLength": 96,
+      "target": 34962
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 4,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 4,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 4,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 6,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5121,
+      "count": 4,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 4,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 2,
+      "type": "MAT4"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5126,
+      "count": 2,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5126,
+      "count": 2,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 9,
+      "componentType": 5126,
+      "count": 2,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 10,
+      "componentType": 5126,
+      "count": 2,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 11,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 12,
+      "componentType": 5126,
+      "count": 6,
+      "type": "VEC4"
+    }
+  ],
+  "materials": [
+    {
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.9,
+          0.3,
+          0.25,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 0.5
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "SkinnedPanel",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2,
+            "JOINTS_0": 4,
+            "WEIGHTS_0": 5
+          },
+          "indices": 3,
+          "mode": 4,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "RootBone",
+      "children": [
+        1
+      ]
+    },
+    {
+      "name": "TipBone"
+    },
+    {
+      "name": "MeshNode",
+      "mesh": 0,
+      "skin": 0
+    }
+  ],
+  "skins": [
+    {
+      "name": "TwoJointSkin",
+      "joints": [
+        0,
+        1
+      ],
+      "inverseBindMatrices": 6,
+      "skeleton": 0
+    }
+  ],
+  "animations": [
+    {
+      "name": "Wave",
+      "samplers": [
+        {
+          "input": 7,
+          "output": 8,
+          "interpolation": "LINEAR"
+        },
+        {
+          "input": 7,
+          "output": 9,
+          "interpolation": "LINEAR"
+        },
+        {
+          "input": 7,
+          "output": 10,
+          "interpolation": "STEP"
+        }
+      ],
+      "channels": [
+        {
+          "sampler": 0,
+          "target": {
+            "node": 1,
+            "path": "translation"
+          }
+        },
+        {
+          "sampler": 1,
+          "target": {
+            "node": 1,
+            "path": "rotation"
+          }
+        },
+        {
+          "sampler": 2,
+          "target": {
+            "node": 1,
+            "path": "scale"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bounce",
+      "samplers": [
+        {
+          "input": 7,
+          "output": 11,
+          "interpolation": "CUBICSPLINE"
+        },
+        {
+          "input": 7,
+          "output": 12,
+          "interpolation": "CUBICSPLINE"
+        }
+      ],
+      "channels": [
+        {
+          "sampler": 0,
+          "target": {
+            "node": 1,
+            "path": "translation"
+          }
+        },
+        {
+          "sampler": 1,
+          "target": {
+            "node": 1,
+            "path": "rotation"
+          }
+        }
+      ]
+    }
+  ],
+  "scenes": [
+    {
+      "nodes": [
+        0,
+        2
+      ]
+    }
+  ],
+  "scene": 0
+}

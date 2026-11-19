@@ -58,6 +58,16 @@ No skeletons, skins, glTF animation channels, morph targets, KHR extensions, ext
 
 `GRAPHICS_SHADER.set_mat4_array(handle,name,matrices)` uploads a single contiguous palette with `glUniformMatrix4fv`, capped at 32 matrices. The OW application controls time, palette uploads and draw lifetime. Mesh, shader and window handle cleanup uses the existing OpenGL resource lifecycle.
 
+## Phase 10: multi-clip animation libraries and elapsed-time playback
+
+The `GltfSkinParser` keeps the Phase 9 **14-field rig** contract intact while decoding up to 16 animation clips from the same glTF 2.0 asset. `GRAPHICS_ANIMATION_LIBRARY` returns a four-field array: `[rig14, clips, names, durations]`. Channel records retain their existing 5-field layout and support LINEAR, STEP and CUBICSPLINE samples. Cubic channels store `[inTangent, value, outTangent]` triples per key, preserving raw derivative magnitudes. Hermite interpolation multiplies tangents by the keyframe time interval, and quaternion outputs are normalized.
+
+`blend_clips` interpolates **per-node translation/scale vectors and rotation quaternions** before computing the skin palette; it does not interpolate 4×4 joint matrices or GPU vertex data. Nodes missing channels use their bind-pose TRS. The same GPU skinned mesh and shader handles are reused during playback.
+
+`GRAPHICS_ANIMATION_CLOCK` exposes an independent monotonic timestamp via `System.nanoTime`; the OW caller subtracts an initial timestamp and uses clip-duration wrapping, not hard-coded frame increments. This clock does not require GLFW or own any OpenGL context.
+
+The new modules are additive: existing `GRAPHICS_GLTF_SKIN.load_rig`, `sample_palette` and `GRAPHICS_MESH.create_skinned_indexed` continue to work unchanged.
+
 ## Lifecycle
 
 `App.boot()` registers all modules, checks contracts and orders startup. `App.stop()` tears down in reverse order. Window creation is explicitly deferred until after boot; this keeps contract checking and non-GPU tests safe. OpenGL resources are released in `graphics.window.close`; opening a new window rebuilds them.
@@ -80,7 +90,8 @@ The extension holds a scoped resource registry per interpreter and context, with
 7c. [x] Phase 7: restricted static embedded glTF, direct-light metallic/roughness, translation keyframes, GPU instancing
 7d. [x] Phase 8: binary GLB, multiple static meshes/primitives and node transforms across scenes
 7e. [x] Phase 9: one bounded glTF skeletal rig, animated TRS sampler and real GPU linear-blend skinning
-8. [ ] MTL/PBR IBL materials, glTF external assets/GLB, skeleton/skin animation, shadow maps, GPU culling
+7f. [x] Phase 10: up to 16 clips, CUBICSPLINE Hermite, local TRS crossfade, monotonic-time playback
+8. [ ] MTL/PBR IBL materials, glTF external assets, multi-skin scene animation, shadows and GPU culling
 9. [ ] Native C ABI / compiler-level FFI after ow-lang supports a stable general-purpose interface
 10. [ ] Windows/macOS physical GPU smoke tests and broader graphics-driver compatibility
 

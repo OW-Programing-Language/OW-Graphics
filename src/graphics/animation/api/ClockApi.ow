@@ -1,0 +1,5 @@
+# Monotonic seconds, independent of GLFW frame rate and window lifecycle.
+# Compute elapsed=now_seconds()-start_seconds once per frame.
+module_type GRAPHICS_ANIMATION_CLOCK:
+  include NATIVE_LIFECYCLE
+  fn now_seconds() -> float
