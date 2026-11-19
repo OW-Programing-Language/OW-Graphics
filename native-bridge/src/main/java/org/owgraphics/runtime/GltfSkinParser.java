@@ -33,6 +33,7 @@ final class GltfSkinParser {
     private static final int MAX_JOINTS = 32;
     private static final int MAX_CHANNELS = 32;
     private static final int MAX_KEYS = 256;
+    private static final int MAX_CLIPS = 16;
     private GltfSkinParser() {}
 
     private static JsonObject obj(JsonElement element,String label) {
@@ -86,6 +87,10 @@ final class GltfSkinParser {
     }
 
     static List<Object> loadRelative(String filename,Path root) {
+        return rigFromLibrary(loadLibraryRelative(filename,root));
+    }
+
+    static List<Object> loadLibraryRelative(String filename,Path root) {
         if(filename==null || filename.isBlank() || filename.length()>4096)
             throw new IllegalArgumentException("Skinned glTF file path required");
         String lower=filename.toLowerCase(Locale.ROOT);
@@ -105,17 +110,30 @@ final class GltfSkinParser {
             long bytes=Files.size(file);
             if(bytes<1 || bytes>(lower.endsWith(".glb")?5_300_000:1_048_576))
                 throw new IllegalArgumentException("glTF animation asset too large");
-            return lower.endsWith(".glb")?fromDocument(GltfSceneParser.readGlb(Files.readAllBytes(file))):
-                    parseJson(Files.readString(file,java.nio.charset.StandardCharsets.UTF_8));
+            return lower.endsWith(".glb")?libraryFromDocument(GltfSceneParser.readGlb(Files.readAllBytes(file))):
+                    parseLibraryJson(Files.readString(file,java.nio.charset.StandardCharsets.UTF_8));
         } catch(IOException e) {
             throw new IllegalArgumentException("Cannot read glTF animation asset",e);
         }
     }
     static List<Object> parseJson(String json) {
-        return fromDocument(GltfModelParser.document(json));
+        return rigFromLibrary(parseLibraryJson(json));
+    }
+
+    static List<Object> parseLibraryJson(String json) {
+        return libraryFromDocument(GltfModelParser.document(json));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Object> rigFromLibrary(List<Object> library) {
+        return (List<Object>) library.get(0);
     }
 
     static List<Object> fromDocument(GltfModelParser.EmbeddedDocument doc) {
+        return rigFromLibrary(libraryFromDocument(doc));
+    }
+
+    static List<Object> libraryFromDocument(GltfModelParser.EmbeddedDocument doc) {
         JsonObject root=doc.root();
         if(root.has("extensionsRequired") && !arr(root,"extensionsRequired").isEmpty())
             throw new IllegalArgumentException("Required glTF extensions unsupported");
@@ -223,59 +241,89 @@ final class GltfSkinParser {
         for(int i=0;i<parents.size();i++)validateParents(i,parents,new byte[parents.size()]);
 
         JsonArray animations=arr(root,"animations");
-        if(animations.size()!=1)throw new IllegalArgumentException("Exactly one glTF animation clip supported");
-        JsonObject animation=obj(animations.get(0),"animation");
-        JsonArray samplers=arr(animation,"samplers");
-        JsonArray channels=arr(animation,"channels");
-        if(channels.isEmpty() || channels.size()>MAX_CHANNELS)
-            throw new IllegalArgumentException("Animation needs 1..32 channels");
-        List<Object> clip=new ArrayList<>();
-        Set<String> channelsUsed=new HashSet<>();
-        for(JsonElement channelElement:channels) {
-            JsonObject channel=obj(channelElement,"animation channel");
-            int samplerIndex=integer(channel,"sampler");
-            if(samplerIndex<0 || samplerIndex>=samplers.size())
-                throw new IllegalArgumentException("Animation sampler out of range");
-            JsonObject sampler=obj(samplers.get(samplerIndex),"animation sampler");
-            JsonObject target=obj(channel.get("target"),"animation target");
-            int node=integer(target,"node");
-            if(node<0 || node>=nodes.size())
-                throw new IllegalArgumentException("Animation target node out of range");
-            String path=target.get("path").getAsString();
-            if(!path.equals("translation") && !path.equals("rotation") && !path.equals("scale"))
-                throw new IllegalArgumentException("Only TRS animation paths supported");
-            if(!channelsUsed.add(node+":"+path))
-                throw new IllegalArgumentException("Duplicate animated node/path");
-            String interpolation=sampler.has("interpolation")?
-                    sampler.get("interpolation").getAsString():"LINEAR";
-            if(!interpolation.equals("LINEAR") && !interpolation.equals("STEP"))
-                throw new IllegalArgumentException("Only LINEAR/STEP glTF samplers supported");
-            GltfModelParser.Accessor in=GltfModelParser.accessor(root,doc.data(),integer(sampler,"input"));
-            GltfModelParser.Accessor out=GltfModelParser.accessor(root,doc.data(),integer(sampler,"output"));
-            int components=path.equals("rotation")?4:3;
-            if(in.components()!=1 || in.componentType()!=5126 || out.components()!=components
-                    || out.componentType()!=5126 || in.count()!=out.count() || in.count()>MAX_KEYS)
-                throw new IllegalArgumentException("Animation samples require matching FLOAT time and VEC3/VEC4");
-            List<Double> times=new ArrayList<>();
-            List<Object> keyValues=new ArrayList<>();
-            for(int k=0;k<in.count();k++) {
-                double t=in.value(k,0);
-                if(t<0 || k>0 && t<=times.get(k-1))
-                    throw new IllegalArgumentException("Animation keyframe time must strictly increase");
-                times.add(t);
-                List<Double> keys=new ArrayList<>();
-                for(int c=0;c<components;c++)keys.add(out.value(k,c));
-                keyValues.add(path.equals("rotation")?list(normalizeQuaternion(keys)):keys);
+        if(animations.isEmpty() || animations.size()>MAX_CLIPS)
+            throw new IllegalArgumentException("Animated glTF must contain 1..16 clips");
+        List<Object> allClips=new ArrayList<>(animations.size());
+        List<Object> clipNames=new ArrayList<>(animations.size());
+        List<Object> clipDurations=new ArrayList<>(animations.size());
+        for(int clipIndex=0;clipIndex<animations.size();clipIndex++) {
+            JsonObject animation=obj(animations.get(clipIndex),"animation");
+            JsonArray samplers=arr(animation,"samplers");
+            JsonArray channels=arr(animation,"channels");
+            if(channels.isEmpty() || channels.size()>MAX_CHANNELS)
+                throw new IllegalArgumentException("Animation clip needs 1..32 channels");
+            List<Object> clip=new ArrayList<>();
+            Set<String> channelsUsed=new HashSet<>();
+            double duration=0;
+            for(JsonElement channelElement:channels) {
+                JsonObject channel=obj(channelElement,"animation channel");
+                int samplerIndex=integer(channel,"sampler");
+                if(samplerIndex<0 || samplerIndex>=samplers.size())
+                    throw new IllegalArgumentException("Animation sampler out of range");
+                JsonObject sampler=obj(samplers.get(samplerIndex),"animation sampler");
+                JsonObject target=obj(channel.get("target"),"animation target");
+                int node=integer(target,"node");
+                if(node<0 || node>=nodes.size())
+                    throw new IllegalArgumentException("Animation target node out of range");
+                String path=target.get("path").getAsString();
+                if(!path.equals("translation") && !path.equals("rotation") && !path.equals("scale"))
+                    throw new IllegalArgumentException("Only TRS animation paths supported");
+                if(!channelsUsed.add(node+":"+path))
+                    throw new IllegalArgumentException("Duplicate animated node/path in one clip");
+                String interpolation=sampler.has("interpolation")?
+                        sampler.get("interpolation").getAsString():"LINEAR";
+                if(!interpolation.equals("LINEAR") && !interpolation.equals("STEP")
+                        && !interpolation.equals("CUBICSPLINE"))
+                    throw new IllegalArgumentException("Only LINEAR, STEP and CUBICSPLINE samplers supported");
+                GltfModelParser.Accessor in=GltfModelParser.accessor(root,doc.data(),integer(sampler,"input"));
+                GltfModelParser.Accessor out=GltfModelParser.accessor(root,doc.data(),integer(sampler,"output"));
+                int components=path.equals("rotation")?4:3;
+                int outputsPerKey=interpolation.equals("CUBICSPLINE")?3:1;
+                if(in.components()!=1 || in.componentType()!=5126 || out.components()!=components
+                        || out.componentType()!=5126 || in.count()*outputsPerKey!=out.count()
+                        || in.count()>MAX_KEYS)
+                    throw new IllegalArgumentException("Animation needs FLOAT times and matching VEC3/VEC4 samples/tangents");
+                List<Double> times=new ArrayList<>();
+                List<Object> keyValues=new ArrayList<>();
+                for(int k=0;k<in.count();k++) {
+                    double t=in.value(k,0);
+                    if(t<0 || k>0 && t<=times.get(k-1))
+                        throw new IllegalArgumentException("Animation keyframe time must strictly increase");
+                    times.add(t);
+                    if(interpolation.equals("CUBICSPLINE")) {
+                        List<Object> triplet=new ArrayList<>(3);
+                        for(int slot=0;slot<3;slot++) {
+                            List<Double> values=new ArrayList<>(components);
+                            for(int c=0;c<components;c++)values.add(out.value(k*3+slot,c));
+                            // glTF cubic derivatives are tangent vectors, NOT unit quaternions.
+                            // Only the value slot of a quaternion sample is normalized.
+                            triplet.add(path.equals("rotation") && slot==1?
+                                    list(normalizeQuaternion(values)):values);
+                        }
+                        keyValues.add(triplet);
+                    } else {
+                        List<Double> values=new ArrayList<>(components);
+                        for(int c=0;c<components;c++)values.add(out.value(k,c));
+                        keyValues.add(path.equals("rotation")?list(normalizeQuaternion(values)):values);
+                    }
+                }
+                duration=Math.max(duration,times.get(times.size()-1));
+                clip.add(List.of(node,path,interpolation,times,keyValues));
             }
-            clip.add(List.of(node,path,interpolation,times,keyValues));
+            String name=animation.has("name")?animation.get("name").getAsString():"Clip "+clipIndex;
+            if(name.isBlank() || name.length()>128)
+                throw new IllegalArgumentException("Animation clip names must be 1..128 chars");
+            allClips.add(clip);
+            clipNames.add(name);
+            clipDurations.add(duration);
         }
         List<Object> result=new ArrayList<>(14);
         result.add(geometry.get(0));result.add(geometry.get(1));
         result.add(geometry.get(2));result.add(geometry.get(3));
         result.add(jointOut);result.add(weightOut);
         result.add(parents);result.add(translations);result.add(rotations);result.add(scales);
-        result.add(skinJoints);result.add(inverseBinds);result.add(clip);result.add(meshNode);
-        return result;
+        result.add(skinJoints);result.add(inverseBinds);result.add(allClips.get(0));result.add(meshNode);
+        return List.of(result,allClips,clipNames,clipDurations);
     }
 
     private static void validateParents(int node,List<Integer> parents,byte[] state) {
