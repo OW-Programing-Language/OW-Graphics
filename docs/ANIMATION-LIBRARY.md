@@ -51,3 +51,7 @@ Use `sample_clip` for clamped single-clip playback and `loop_time` to wrap the t
 This milestone accepts 1..16 clips on **one skin and one skinned mesh/primitive**, with 1..32 channels/clip, 1..256 keys/channel, 1..32 joints and 1..64 nodes, using the same bounded GLB/embedded-buffer reader as Phase 9. Still unsupported: multiple skinned meshes/skins per document, animation blending trees/events, per-node constraints/IK, morph targets, glTF external resources, multi-clip crossfade root-motion logic, normalized integer skin weights, and Vulkan.
 
 CPU JUnit tests confirm Hermite values differ from linear interpolation, quaternion normalization, clip bounds, legacy API compatibility and correct local TRS blending. Mesa/Xvfb tests render distinct bone poses and read back pixels to verify intermediate crossfade movement. The OW/flOW smoke example checks the native modules and real GPU resource lifecycle.
+
+## Phase 11 controller
+
+The optional typed `GRAPHICS_ANIMATION_STATE_MACHINE`, `GRAPHICS_ANIMATION_LAYER` and `GRAPHICS_ANIMATION_TIMELINE` modules build on this library. They implement deterministic OW transitions, an additive clip overlay on selected joints, application-authored markers and loop-aware selected-node local translation extraction. They do **not** alter the existing library's return format. See [Animation Controller](ANIMATION-CONTROLLER.md).
