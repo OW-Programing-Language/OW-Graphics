@@ -22,6 +22,8 @@ module Graphics.OpenGLShader: GRAPHICS_SHADER
     return: extension("graphics.shader.uniform4", handle, name, r, g, b, a)
   fn set_mat4(handle int, name string, values array) -> int:
     return: extension("graphics.shader.uniform_mat4", handle, name, values)
+  fn set_mat4_array(handle int, name string, matrices array) -> int:
+    return: extension("graphics.shader.uniform_mat4_array", handle, name, matrices)
   fn set_int(handle int, name string, value int) -> int:
     return: extension("graphics.shader.uniform_int", handle, name, value)
   fn destroy(handle int) -> int:

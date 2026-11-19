@@ -37,6 +37,19 @@ module Graphics.HeadlessShader: GRAPHICS_SHADER
     if: len(values) != 16
       return: 0
     return: 1
+  fn set_mat4_array(handle int, name string, matrices array) -> int:
+    if: handle < 1
+      return: 0
+    if: len(matrices) < 1
+      return: 0
+    if: len(matrices) > 32
+      return: 0
+    set i int: 0
+    while: i < len(matrices)
+      if: len(matrices[i]) != 16
+        return: 0
+      set i: i + 1
+    return: 1
   fn set_int(handle int, name string, value int) -> int:
     if: handle < 1
       return: 0
