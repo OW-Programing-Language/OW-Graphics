@@ -53,6 +53,10 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
                  "graphics.model.parse_gltf", "graphics.model.load_gltf",
                  "graphics.scene.parse_gltf", "graphics.scene.load_gltf",
                  "graphics.skin.parse_gltf", "graphics.skin.load_gltf", "graphics.skin.sample",
+                 "graphics.animation.library.parse", "graphics.animation.library.load",
+                 "graphics.animation.library.sample", "graphics.animation.library.blend",
+                 "graphics.animation.library.duration", "graphics.animation.library.loop",
+                 "graphics.animation.clock.now_seconds",
                  "graphics.mesh.draw_instanced" -> true;
             default -> false;
         };
@@ -83,6 +87,13 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.skin.parse_gltf" -> parseSkinnedGltf(args);
             case "graphics.skin.load_gltf" -> loadSkinnedGltf(args);
             case "graphics.skin.sample" -> sampleSkinnedGltf(args);
+            case "graphics.animation.library.parse" -> parseAnimationLibrary(args);
+            case "graphics.animation.library.load" -> loadAnimationLibrary(args);
+            case "graphics.animation.library.sample" -> sampleAnimationClip(args);
+            case "graphics.animation.library.blend" -> blendAnimationClips(args);
+            case "graphics.animation.library.duration" -> animationClipDuration(args);
+            case "graphics.animation.library.loop" -> loopAnimationTime(args);
+            case "graphics.animation.clock.now_seconds" -> monotonicSeconds(args);
             case "graphics.opengl.clear" -> clearFrame(args);
             case "graphics.opengl.depth_test" -> configureDepth(args);
             case "graphics.opengl.triangle" -> drawTriangle(args);
@@ -517,6 +528,62 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             throw new IllegalArgumentException("Animation time must be numeric");
         double time=number.doubleValue();
         return GltfSkinParser.sample(rig,time);
+    }
+
+    private List<Object> parseAnimationLibrary(List<Object> args) {
+        count(args,1);
+        return GltfSkinParser.parseLibraryJson(
+                GraphicsArguments.string(args.get(0),"animation library JSON"));
+    }
+
+    private List<Object> loadAnimationLibrary(List<Object> args) {
+        count(args,1);
+        return GltfSkinParser.loadLibraryRelative(
+                GraphicsArguments.string(args.get(0),"animation library path"),
+                Path.of("").toAbsolutePath());
+    }
+
+    private List<Object> sampleAnimationClip(List<Object> args) {
+        count(args,3);
+        if(!(args.get(0) instanceof List<?> lib))
+            throw new IllegalArgumentException("Animation library is an array");
+        return GltfSkinParser.sampleClip(lib,
+                GraphicsArguments.integer(args.get(1),"clip index"),
+                GraphicsArguments.finiteFloat(args.get(2),"clip time"));
+    }
+
+    private List<Object> blendAnimationClips(List<Object> args) {
+        count(args,6);
+        if(!(args.get(0) instanceof List<?> lib))
+            throw new IllegalArgumentException("Animation library is an array");
+        return GltfSkinParser.blendClips(lib,
+                GraphicsArguments.integer(args.get(1),"source clip index"),
+                GraphicsArguments.finiteFloat(args.get(2),"source time"),
+                GraphicsArguments.integer(args.get(3),"destination clip index"),
+                GraphicsArguments.finiteFloat(args.get(4),"destination time"),
+                GraphicsArguments.finiteFloat(args.get(5),"crossfade weight"));
+    }
+
+    private double animationClipDuration(List<Object> args) {
+        count(args,2);
+        if(!(args.get(0) instanceof List<?> lib))
+            throw new IllegalArgumentException("Animation library is an array");
+        return GltfSkinParser.clipDuration(lib,
+                GraphicsArguments.integer(args.get(1),"clip index"));
+    }
+
+    private double loopAnimationTime(List<Object> args) {
+        count(args,3);
+        if(!(args.get(0) instanceof List<?> lib))
+            throw new IllegalArgumentException("Animation library is an array");
+        return GltfSkinParser.loopTime(lib,
+                GraphicsArguments.integer(args.get(1),"clip index"),
+                GraphicsArguments.finiteFloat(args.get(2),"elapsed seconds"));
+    }
+
+    private double monotonicSeconds(List<Object> args) {
+        count(args,0);
+        return System.nanoTime()*1e-9;
     }
 
     private int createSkinnedMesh(List<Object> args) {
