@@ -170,3 +170,6 @@ jobs:
           xvfb-run -a -s "-screen 0 800x600x24" env LIBGL_ALWAYS_SOFTWARE=1 \
             java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/test-classes:native-bridge/target/classes:native-bridge/target/lib/*" \
             dev.oreo.Main run examples/animation_crowd/smoke.ow
+          xvfb-run -a -s "-screen 0 800x600x24" env LIBGL_ALWAYS_SOFTWARE=1 \
+            java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/test-classes:native-bridge/target/classes:native-bridge/target/lib/*" \
+            org.owgraphics.runtime.AnimationCrowdGpuSmoke
