@@ -368,7 +368,7 @@ final class GltfSkinParser {
     private static double[] sampled(String path,String interp,List<?> times,List<?> values,double time) {
         int n=times.size();
         int hi=0;
-        while(hi<n && time>num(times.get(hi)))hi++;
+        while(hi<n && time>=num(times.get(hi)))hi++;
         if(hi==0)return toDouble(requiredList(values.get(0),"keyframe",4));
         if(hi==n)return toDouble(requiredList(values.get(n-1),"keyframe",4));
         if(interp.equals("STEP"))return toDouble(requiredList(values.get(hi-1),"keyframe",4));
