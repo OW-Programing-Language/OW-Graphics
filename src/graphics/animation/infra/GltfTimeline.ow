@@ -1,0 +1,20 @@
+# CPU-only polling: never emits callbacks or mutates a character transform.
+module Graphics.GltfTimeline: GRAPHICS_ANIMATION_TIMELINE
+  fn name() -> string:
+    return: "animation_timeline"
+  fn requires() -> array:
+    return: []
+  fn register() -> int:
+    return: 0
+  fn start() -> int:
+    return: 0
+  fn stop() -> int:
+    return: 0
+  fn reload() -> int:
+    return: 0
+  fn on_event(type string, payload int) -> int:
+    return: 0
+  fn events_between(library array, clip int, markers array, previousSeconds float, currentSeconds float) -> array:
+    return: extension("graphics.animation.timeline.events", library, clip, markers, previousSeconds, currentSeconds)
+  fn root_delta(library array, clip int, node int, previousSeconds float, currentSeconds float) -> array:
+    return: extension("graphics.animation.timeline.root_delta", library, clip, node, previousSeconds, currentSeconds)

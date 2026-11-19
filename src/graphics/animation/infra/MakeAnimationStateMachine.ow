@@ -1,0 +1,58 @@
+# flOW typed functor; transition bookkeeping is pure OW (no native state).
+# A clip switch starts at t=0 and advances during the current tick.
+# During a crossfade further requests are ignored until completion.
+functor MakeAnimationStateMachine(L: GRAPHICS_ANIMATION_LIBRARY) -> GRAPHICS_ANIMATION_STATE_MACHINE:
+  fn name() -> string:
+    return: "animation_state_machine"
+  fn requires() -> array:
+    return: ["animation_library"]
+  fn register() -> int:
+    return: 0
+  fn start() -> int:
+    return: 0
+  fn stop() -> int:
+    return: 0
+  fn reload() -> int:
+    return: 0
+  fn on_event(type string, payload int) -> int:
+    return: 0
+  fn initial(library array, clip int) -> array:
+    call: assert(clip >= 0, "initial clip must be nonnegative")
+    call: assert(L.clip_duration(library, clip) >= 0.0, "initial clip duration")
+    return: [clip, 0.0, 0 - 1, 0.0, 0.0, 0.0]
+  fn tick(library array, state array, desiredClip int, deltaSeconds float, fadeSeconds float) -> array:
+    call: assert(len(state) == 6, "animation state must have six fields")
+    call: assert(deltaSeconds >= 0.0, "delta must be nonnegative")
+    call: assert(deltaSeconds <= 60.0, "delta must be at most one minute")
+    call: assert(fadeSeconds >= 0.0, "fade seconds must be nonnegative")
+    call: assert(fadeSeconds <= 60.0, "fade must be at most one minute")
+    call: assert(desiredClip >= 0, "desired clip must be nonnegative")
+    call: assert(L.clip_duration(library, desiredClip) >= 0.0, "desired clip exists")
+    set currentClip int: state[0]
+    set currentElapsed float: state[1] + deltaSeconds
+    call: assert(currentClip >= 0, "current clip index")
+    call: assert(L.clip_duration(library, currentClip) >= 0.0, "current clip exists")
+    if: state[2] >= 0
+      call: assert(state[5] > 0.0, "active fade must have duration")
+      set progressed float: state[4] + deltaSeconds
+      if: progressed >= state[5]
+        return: [currentClip, currentElapsed, 0 - 1, 0.0, 0.0, 0.0]
+      return: [currentClip, currentElapsed, state[2], state[3] + deltaSeconds, progressed, state[5]]
+    if: desiredClip == currentClip
+      return: [currentClip, currentElapsed, 0 - 1, 0.0, 0.0, 0.0]
+    if: fadeSeconds == 0.0
+      return: [desiredClip, deltaSeconds, 0 - 1, 0.0, 0.0, 0.0]
+    if: deltaSeconds >= fadeSeconds
+      return: [desiredClip, deltaSeconds, 0 - 1, 0.0, 0.0, 0.0]
+    return: [desiredClip, deltaSeconds, currentClip, currentElapsed, deltaSeconds, fadeSeconds]
+  fn sample(library array, state array) -> array:
+    call: assert(len(state) == 6, "animation state must have six fields")
+    set clip int: state[0]
+    set current float: L.loop_time(library, clip, state[1])
+    if: state[2] >= 0
+      call: assert(state[5] > 0.0, "active fade duration")
+      set sourceClip int: state[2]
+      set previous float: L.loop_time(library, sourceClip, state[3])
+      set amount float: state[4] / state[5]
+      return: L.blend_clips(library, sourceClip, previous, clip, current, amount)
+    return: L.sample_clip(library, clip, current)

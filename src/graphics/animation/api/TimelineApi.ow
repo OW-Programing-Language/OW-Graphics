@@ -1,0 +1,8 @@
+# Explicit game-authored markers; NOT part of standard glTF animation.
+# Markers: [clipIndex, clipLocalSeconds, name].
+# Query returns [name, absoluteSeconds, markerSeconds] in (previous,current].
+# root_delta returns selected node-local xyz motion, including clip wrapping.
+module_type GRAPHICS_ANIMATION_TIMELINE:
+  include NATIVE_LIFECYCLE
+  fn events_between(library array, clip int, markers array, previousSeconds float, currentSeconds float) -> array
+  fn root_delta(library array, clip int, node int, previousSeconds float, currentSeconds float) -> array
