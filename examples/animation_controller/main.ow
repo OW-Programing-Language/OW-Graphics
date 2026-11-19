@@ -88,12 +88,16 @@ main:
         set desired: 2
       if: cycle >= 6.0
         set desired: 1
+      set oldClip int: animationState[0]
       set oldWalk float: animationState[1]
       set animationState: machine.tick(library, animationState, desired, delta, 0.7)
       set pose: machine.sample(library, animationState)
       if: animationState[0] == 2
-        set walked: timeline.root_delta(library, 2, 0, oldWalk, animationState[1])
-        set notices: timeline.events_between(library, 2, markers, oldWalk, animationState[1])
+        set previousWalk float: oldWalk
+        if: oldClip != 2
+          set previousWalk: 0.0
+        set walked: timeline.root_delta(library, 2, 0, previousWalk, animationState[1])
+        set notices: timeline.events_between(library, 2, markers, previousWalk, animationState[1])
         if: len(notices) > 0
           print: "Walk footstep event"
         if: animationState[2] < 0
