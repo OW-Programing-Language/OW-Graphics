@@ -1,0 +1,7 @@
+# Decode a static glTF 2.0 scene (.gltf with embedded buffer or .glb).
+# Returns [primitives, parentIndices, localMatrices, perNodePrimitiveIds].
+# Parent indices are already parent-first for MakeSceneGraph(Transforms).
+module_type GRAPHICS_GLTF_SCENE:
+  include NATIVE_LIFECYCLE
+  fn parse_scene(contents string) -> array
+  fn load_scene(relativePath string) -> array
