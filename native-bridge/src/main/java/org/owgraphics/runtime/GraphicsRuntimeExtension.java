@@ -47,7 +47,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
                  "graphics.mesh.draw", "graphics.mesh.destroy",
                  "graphics.texture.create_rgba8", "graphics.texture.load_image", "graphics.texture.bind",
                  "graphics.texture.destroy", "graphics.input.key_down",
-                 "graphics.input.cursor_delta", "graphics.input.scroll_delta",
+                 "graphics.input.cursor_ndc", "graphics.input.cursor_delta", "graphics.input.scroll_delta",
                  "graphics.input.mouse_button_down",
                  "graphics.model.parse_obj", "graphics.model.load_obj",
                  "graphics.model.parse_gltf", "graphics.model.load_gltf",
@@ -78,6 +78,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.window.request_close" -> requestClose(args);
             case "graphics.input.escape" -> escapePressed(args);
             case "graphics.input.key_down" -> keyDown(args);
+            case "graphics.input.cursor_ndc" -> cursorNdc(args);
             case "graphics.input.cursor_delta" -> cursorDelta(args);
             case "graphics.input.mouse_button_down" -> mouseButtonDown(args);
             case "graphics.input.scroll_delta" -> scrollDelta(args);
@@ -269,6 +270,34 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
         };
         ensureOwner();
         return glfwGetMouseButton(window, button) == GLFW_PRESS ? 1 : 0;
+    }
+
+    /**
+     * Absolute pointer for fixed-size native UI hit testing. GLFW reports
+     * logical window coordinates (origin top-left), whereas OpenGL cards use
+     * NDC with origin in the center and positive Y upwards. Query the actual
+     * window dimensions rather than framebuffer pixels for HiDPI correctness.
+     * Values beyond +/-1 are retained so consumers can reject off-window
+     * clicks, instead of accidentally activating an edge button.
+     */
+    private List<Double> cursorNdc(List<Object> args) {
+        count(args, 0);
+        ensureOwner();
+        try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+            var x = stack.mallocDouble(1);
+            var y = stack.mallocDouble(1);
+            var width = stack.mallocInt(1);
+            var height = stack.mallocInt(1);
+            glfwGetCursorPos(window, x, y);
+            glfwGetWindowSize(window, width, height);
+            if (!Double.isFinite(x.get(0)) || !Double.isFinite(y.get(0)))
+                throw new IllegalStateException("GLFW returned invalid cursor coordinates");
+            int w = width.get(0), h = height.get(0);
+            if (w <= 0 || h <= 0)
+                throw new IllegalStateException("GLFW returned invalid window dimensions");
+            return List.of(2.0 * x.get(0) / w - 1.0,
+                           1.0 - 2.0 * y.get(0) / h);
+        }
     }
 
     private List<Double> cursorDelta(List<Object> args) {
