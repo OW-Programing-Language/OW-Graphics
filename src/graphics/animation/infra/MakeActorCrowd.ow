@@ -1,0 +1,120 @@
+# Pure OW multi-actor animation system. No global native state or extra GPU
+# mesh uploads: apps bind one uModel/uBones pair per actor and draw a shared mesh.
+# This first version extracts LOCAL TRANSLATION of a root common to all joints
+# during stable playback; root motion is frozen during crossfade.
+functor MakeActorCrowd(G: GRAPHICS_ANIMATION_GRAPH) -> GRAPHICS_ANIMATION_CROWD:
+  fn name() -> string:
+    return: "animation_crowd"
+  fn requires() -> array:
+    return: ["animation_graph", "animation_library", "animation_timeline", "transforms"]
+  fn register() -> int:
+    return: 0
+  fn start() -> int:
+    return: 0
+  fn stop() -> int:
+    return: 0
+  fn reload() -> int:
+    return: 0
+  fn on_event(type string, payload int) -> int:
+    return: 0
+  fn spawn(library array, clip int, xyz array, rootNode int) -> array:
+    call: assert(len(xyz) == 3, "actor position requires XYZ")
+    call: assert(rootNode >= 0, "root node index must be nonnegative")
+    set rig: library[0]
+    set parents: rig[6]
+    set joints: rig[10]
+    call: assert(rootNode < len(parents), "root node must exist")
+    # Applying a root-local offset to all joint matrices is valid only when
+    # the root is an ancestor of every skin joint, as checked here.
+    set i int: 0
+    while: i < len(joints)
+      set node int: joints[i]
+      set found int: 0
+      set steps int: 0
+      while: node >= 0
+        if: node == rootNode
+          set found: 1
+          set node: 0 - 1
+        else:
+          call: assert(node < len(parents), "invalid skeleton parent")
+          set node: parents[node]
+        set steps: steps + 1
+        call: assert(steps <= len(parents), "joint hierarchy must be acyclic")
+      call: assert(found == 1, "motion root must be an ancestor of each skin joint")
+      set i: i + 1
+    set state: G.initial(library, clip)
+    return: [state, xyz, rootNode, [0.0, 0.0, 0.0]]
+  fn advance(library array, actor array, rules array, trigger string, deltaSeconds float) -> array:
+    call: assert(len(actor) == 4, "actor state must have four fields")
+    set original: actor[0]
+    set updated: G.advance(library, original, rules, trigger, deltaSeconds)
+    set root int: actor[2]
+    set position: actor[1]
+    call: assert(len(position) == 3, "actor world position must be XYZ")
+    # Integrate stable clip motion ONCE into actor position. We intentionally
+    # do not integrate during crossfade; the palette is anchored there too.
+    if: original[0] == updated[0]
+      if: original[2] < 0
+        if: updated[2] < 0
+          set displacement: Graphics.GltfTimeline.root_delta(library, updated[0], root, original[1], updated[1])
+          set position: [position[0] + displacement[0], position[1] + displacement[1], position[2] + displacement[2]]
+    set offset: Graphics.GltfTimeline.root_delta(library, updated[0], root, 0.0, Graphics.GltfAnimationLibrary.loop_time(library, updated[0], updated[1]))
+    if: updated[2] >= 0
+      set fromOffset: Graphics.GltfTimeline.root_delta(library, updated[2], root, 0.0, Graphics.GltfAnimationLibrary.loop_time(library, updated[2], updated[3]))
+      set alpha float: updated[4] / updated[5]
+      set offset: [fromOffset[0] + (offset[0] - fromOffset[0]) * alpha, fromOffset[1] + (offset[1] - fromOffset[1]) * alpha, fromOffset[2] + (offset[2] - fromOffset[2]) * alpha]
+    return: [updated, position, root, offset]
+  fn advance_all(library array, actors array, rules array, triggers array, deltaSeconds float) -> array:
+    call: assert(len(actors) <= 32, "maximum 32 actors")
+    call: assert(len(actors) == len(triggers), "each actor needs its own trigger")
+    set updated: array(len(actors), [])
+    set i int: 0
+    while: i < len(actors)
+      set actor: actors[i]
+      call: assert(len(actor) == 4, "actor state must have four fields")
+      set original: actor[0]
+      set next: G.advance(library, original, rules, triggers[i], deltaSeconds)
+      set root int: actor[2]
+      set position: actor[1]
+      call: assert(len(position) == 3, "actor world position must be XYZ")
+      if: original[0] == next[0]
+        if: original[2] < 0
+          if: next[2] < 0
+            set delta: Graphics.GltfTimeline.root_delta(library, next[0], root, original[1], next[1])
+            set position: [position[0] + delta[0], position[1] + delta[1], position[2] + delta[2]]
+      set offset: Graphics.GltfTimeline.root_delta(library, next[0], root, 0.0, Graphics.GltfAnimationLibrary.loop_time(library, next[0], next[1]))
+      if: next[2] >= 0
+        set source: Graphics.GltfTimeline.root_delta(library, next[2], root, 0.0, Graphics.GltfAnimationLibrary.loop_time(library, next[2], next[3]))
+        set alpha float: next[4] / next[5]
+        set offset: [source[0] + (offset[0] - source[0]) * alpha, source[1] + (offset[1] - source[1]) * alpha, source[2] + (offset[2] - source[2]) * alpha]
+      set updated[i]: [next, position, root, offset]
+      set i: i + 1
+    return: updated
+  fn palette(library array, actor array) -> array:
+    call: assert(len(actor) == 4, "actor state must have four fields")
+    set matrices: G.sample(library, actor[0])
+    set offset: actor[3]
+    call: assert(len(offset) == 3, "root offset must be XYZ")
+    set anchored: array(len(matrices), [])
+    set i int: 0
+    while: i < len(matrices)
+      set original: matrices[i]
+      call: assert(len(original) == 16, "skinning matrix must have 16 elements")
+      set matrix: array(16, 0.0)
+      set j int: 0
+      while: j < 16
+        set matrix[j]: original[j]
+        set j: j + 1
+      # Strip out sampled root translation when world actor position has
+      # already accumulated it, avoiding double motion.
+      set matrix[12]: matrix[12] - offset[0]
+      set matrix[13]: matrix[13] - offset[1]
+      set matrix[14]: matrix[14] - offset[2]
+      set anchored[i]: matrix
+      set i: i + 1
+    return: anchored
+  fn model(actor array) -> array:
+    call: assert(len(actor) == 4, "actor state must have four fields")
+    set world: actor[1]
+    call: assert(len(world) == 3, "world XYZ required")
+    return: Graphics.Transforms.translation(world[0], world[1], world[2])

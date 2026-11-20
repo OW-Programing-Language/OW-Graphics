@@ -1,0 +1,72 @@
+# Phase 12: pure OW transition rules, multiple actor timelines and root anchoring.
+import "@flow/src/App.ow"
+import "../src/graphics/animation/api/AnimationLibraryApi.ow"
+import "../src/graphics/animation/infra/GltfAnimationLibrary.ow"
+import "../src/graphics/animation/api/StateMachineApi.ow"
+import "../src/graphics/animation/infra/MakeAnimationStateMachine.ow"
+import "../src/graphics/animation/api/AnimationGraphApi.ow"
+import "../src/graphics/animation/infra/MakeAnimationGraph.ow"
+import "../src/graphics/animation/api/ActorCrowdApi.ow"
+import "../src/graphics/animation/infra/MakeActorCrowd.ow"
+import "../src/graphics/animation/api/TimelineApi.ow"
+import "../src/graphics/animation/infra/GltfTimeline.ow"
+import "../src/graphics/math/api/TransformApi.ow"
+import "../src/graphics/math/infra/Transforms.ow"
+
+main:
+  set sm GRAPHICS_ANIMATION_STATE_MACHINE: MakeAnimationStateMachine(Graphics.GltfAnimationLibrary)
+  set graph GRAPHICS_ANIMATION_GRAPH: MakeAnimationGraph(sm)
+  set batch GRAPHICS_ANIMATION_CROWD: MakeActorCrowd(graph)
+  set app: new App()
+  call: app.use_native_as(batch, "GRAPHICS_ANIMATION_CROWD")
+  call: app.use_native_as(graph, "GRAPHICS_ANIMATION_GRAPH")
+  call: app.use_native_as(sm, "GRAPHICS_ANIMATION_STATE_MACHINE")
+  call: app.use_native_as(Graphics.GltfAnimationLibrary, "GRAPHICS_ANIMATION_LIBRARY")
+  call: app.use_native_as(Graphics.GltfTimeline, "GRAPHICS_ANIMATION_TIMELINE")
+  call: app.use_native_as(Graphics.Transforms, "GRAPHICS_TRANSFORM")
+  call: assert(app.boot() == 1, "phase12 flOW dependency boot")
+  set animations GRAPHICS_ANIMATION_LIBRARY: app.service("animation_library")
+  set actors GRAPHICS_ANIMATION_CROWD: app.service("animation_crowd")
+  set routes GRAPHICS_ANIMATION_GRAPH: app.service("animation_graph")
+  set library: animations.load_library("examples/animation_controller/assets/three_clips.glb")
+  set rules: [[0, 2, "walk", 0.5], [2, 0, "stop", 0.25], [0 - 1, 1, "bounce", 0.1]]
+  set started: actors.spawn(library, 0, [0.0 - 0.6, 0.0, 0.0], 0)
+  call: assert(started[0][0] == 0, "initial Wave animation")
+  call: assert(started[1][0] == 0.0 - 0.6, "initial world placement")
+  set walking: actors.spawn(library, 2, [0.0, 0.0, 0.0], 0)
+  set bouncing: actors.spawn(library, 1, [0.6, 0.0, 0.0], 0)
+  set fleet: [started, walking, bouncing]
+  set fleet: actors.advance_all(library, fleet, rules, ["", "", ""], 0.25)
+  call: assert(fleet[0][0][0] == 0, "first actor stays Wave")
+  call: assert(fleet[1][0][0] == 2, "second actor stays Walk")
+  call: assert(fleet[2][0][0] == 1, "third actor stays Bounce")
+  call: assert(fleet[1][1][0] > 0.249, "walk accumulated world displacement")
+  call: assert(fleet[1][1][0] < 0.251, "walk displacement accurate")
+  call: assert(fleet[0][1][0] == 0.0 - 0.6, "independent Wave position")
+  call: assert(fleet[2][1][0] == 0.6, "independent Bounce position")
+  set walkPalette: actors.palette(library, fleet[1])
+  call: assert(len(walkPalette) == 2, "two skin matrices per Walk actor")
+  call: assert(walkPalette[0][12] == 0.0, "walking root translation cancelled from skin palette")
+  set walkModel: actors.model(fleet[1])
+  call: assert(walkModel[12] > 0.249, "root movement applied to model transform once")
+  call: assert(walkModel[12] < 0.251, "root movement not doubled")
+  set fleet: actors.advance_all(library, fleet, rules, ["walk", "", "bounce"], 0.1)
+  call: assert(fleet[0][0][0] == 2, "rule Wave to Walk triggered")
+  call: assert(fleet[0][0][2] == 0, "transition source is Wave")
+  call: assert(fleet[0][0][4] == 0.1, "fade advances via delta")
+  call: assert(fleet[2][0][0] == 1, "wildcard same clip keeps current")
+  call: assert(fleet[1][1][0] > 0.349, "Walk continues independently")
+  set routeState: routes.initial(library, 0)
+  set routeState: routes.advance(library, routeState, rules, "missing", 0.1)
+  call: assert(routeState[0] == 0, "unmatched trigger leaves clip unchanged")
+  set routeState: routes.advance(library, routeState, rules, "walk", 0.1)
+  call: assert(routeState[0] == 2, "event transition chooses Walk")
+  set routeState: routes.advance(library, routeState, rules, "bounce", 0.1)
+  call: assert(routeState[0] == 2, "in-progress fade ignores new trigger")
+  set fleet: actors.advance_all(library, fleet, rules, ["", "", ""], 0.5)
+  call: assert(fleet[0][0][2] == 0 - 1, "first actor fade finishes")
+  set fleet: actors.advance_all(library, fleet, rules, ["", "", ""], 0.2)
+  call: assert(fleet[0][1][0] > 0.0 - 0.401, "first actor accumulates movement once")
+  call: assert(fleet[0][1][0] < 0.0 - 0.399, "first actor displacement accurate")
+  call: assert(app.stop() == 1, "flOW state modules released")
+  print: "PASS: OW configurable animation graph, 3 actor timelines and single-apply root motion"

@@ -76,6 +76,16 @@ The new modules are additive: existing `GRAPHICS_GLTF_SKIN.load_rig`, `sample_pa
 
 `GRAPHICS_ANIMATION_TIMELINE` is a CPU-only, **polling-based** service for authored marker events and optional selected-node local root-motion deltas. Events are **not** standardized glTF extras and do not automatically invoke callbacks or mutate the game state. Root-motion extraction returns one node's local `xyz` displacement including loop crossings; the game must decide how to apply it to its character transform. Methods cap query size/cycles and validate node/clip indices.
 
+## Phase 12: configurable graph and independently animated actors
+
+`MakeAnimationGraph(StateMachine)` is a typed **pure OW flOW functor**. A graph evaluates an ordered bounded set of transition rules `[fromClip,toClip,trigger,fadeSeconds]` and advances the Phase 11 six-field state machine. The first matching active-source rule wins; `fromClip=-1` is a wildcard. The graph never dispatches events or allocates GPU resources.
+
+`MakeActorCrowd(Graph)` is another OW functor that manages up to 32 independent actors through the existing `GltfAnimationLibrary`, `GltfTimeline` and `Transforms` modules. Actor state is explicit: `[controllerState6,worldPositionXYZ,rootNode,paletteRootOffsetXYZ]`. Each actor owns animation time and integrated root translation but shares the original glTF rig/mesh resource in the composition root. `advance_all` maps independent input triggers across actors.
+
+For a chosen root node that is an ancestor of **every joint**, `advance` accumulates selected-node local root translation on the actor world XYZ only during stable clip playback. The per-pose `palette` subtracts the corresponding sampled root translation from every GPU joint matrix; the separate `model` matrix contains the actor world position. This avoids applying the same Walk translation twice. Root motion is frozen during crossfades, and the anchor offset is blended with crossfade progress. Rotation and arbitrary world/mesh hierarchy compensation are not supported by this first controller.
+
+The OpenGL example binds `uBones` and `uModel` independently per actor, and issues **three ordinary skinned draw calls with one shared mesh**. This is not GPU-instanced skinning or a multi-skin glTF importer.
+
 ## Lifecycle
 
 `App.boot()` registers all modules, checks contracts and orders startup. `App.stop()` tears down in reverse order. Window creation is explicitly deferred until after boot; this keeps contract checking and non-GPU tests safe. OpenGL resources are released in `graphics.window.close`; opening a new window rebuilds them.
@@ -100,6 +110,7 @@ The extension holds a scoped resource registry per interpreter and context, with
 7e. [x] Phase 9: one bounded glTF skeletal rig, animated TRS sampler and real GPU linear-blend skinning
 7f. [x] Phase 10: up to 16 clips, CUBICSPLINE Hermite, local TRS crossfade, monotonic-time playback
 7g. [x] Phase 11: pure OW state machine, additive skeletal layers, authored markers and local root-motion deltas
+7h. [x] Phase 12: configurable transition graph, up to 32 actor timelines and translation-only root-motion anchoring
 8. [ ] MTL/PBR IBL materials, glTF external assets, multi-skin scene animation, shadows and GPU culling
 9. [ ] Native C ABI / compiler-level FFI after ow-lang supports a stable general-purpose interface
 10. [ ] Windows/macOS physical GPU smoke tests and broader graphics-driver compatibility

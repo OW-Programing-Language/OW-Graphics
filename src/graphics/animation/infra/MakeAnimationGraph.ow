@@ -1,0 +1,51 @@
+# Pure OW transition-rule graph, composable with Phase 11 state machine.
+# Transition requests during an active crossfade are ignored (non-interruptible).
+functor MakeAnimationGraph(M: GRAPHICS_ANIMATION_STATE_MACHINE) -> GRAPHICS_ANIMATION_GRAPH:
+  fn name() -> string:
+    return: "animation_graph"
+  fn requires() -> array:
+    return: ["animation_state_machine"]
+  fn register() -> int:
+    return: 0
+  fn start() -> int:
+    return: 0
+  fn stop() -> int:
+    return: 0
+  fn reload() -> int:
+    return: 0
+  fn on_event(type string, payload int) -> int:
+    return: 0
+  fn initial(library array, clip int) -> array:
+    return: M.initial(library, clip)
+  fn advance(library array, state array, rules array, trigger string, deltaSeconds float) -> array:
+    call: assert(len(state) == 6, "animation state requires six fields")
+    call: assert(len(rules) <= 128, "animation graph has at most 128 rules")
+    call: assert(deltaSeconds >= 0.0, "delta must be nonnegative")
+    call: assert(deltaSeconds <= 60.0, "delta must be bounded")
+    set target int: state[0]
+    set fade float: 0.0
+    if: state[2] < 0
+      set matched int: 0
+      set i int: 0
+      while: i < len(rules)
+        set route: rules[i]
+        call: assert(len(route) == 4, "rule must be [from,to,trigger,fadeSeconds]")
+        call: assert(route[0] >= 0 - 1, "source clip must be -1 or valid")
+        call: assert(route[1] >= 0, "destination clip index must be nonnegative")
+        call: assert(route[3] >= 0.0, "rule fade must be nonnegative")
+        call: assert(route[3] <= 60.0, "rule fade must be bounded")
+        if: matched == 0
+          if: route[2] == trigger
+            if: route[0] == 0 - 1
+              set target: route[1]
+              set fade: route[3]
+              set matched: 1
+            else:
+              if: route[0] == state[0]
+                set target: route[1]
+                set fade: route[3]
+                set matched: 1
+        set i: i + 1
+    return: M.tick(library, state, target, deltaSeconds, fade)
+  fn sample(library array, state array) -> array:
+    return: M.sample(library, state)

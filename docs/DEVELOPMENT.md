@@ -338,3 +338,26 @@ java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/ow-graphics-native-0.
 The first implementation retains Phase 10 limits (16 clips, one skinned mesh and skin, up to 32 joints, 64 nodes), and adds bounded event scans (128 markers and 128 fired events, max 128 crossed cycles). No layered masks from a visual editor, state graph conditions, IK, retargeting, foot locking, motion matching or native Vulkan.
 
 CI runs JUnit state/layer/timeline and boundary cases, actual OW/flOW source type-checks and headless execution, a GPU Mesa smoke proving the additive layer changes pixels and the Walk root moves the skinned mesh, and full OW→OpenGL smoke for the controller.
+
+## 13. Phase 12 — transition rules, multiple actors and anchored root motion
+
+The new [three-character OW scene](../examples/animation_crowd/main.ow) demonstrates **Wave**, **Bounce** and **Walk** for three independent characters, each with its own state machine and world transform, drawn with one shared GPU mesh. The scene reuses the Phase 11 checked-in `three_clips.glb`, not a duplicated binary asset.
+
+```sh
+ow deps install
+ow check tests/animation_crowd.ow
+ow check examples/animation_crowd/main.ow
+mvn -f native-bridge/pom.xml test
+# Build the native SPI as explained above, then from repository root:
+java -cp "../ow-lang/target/OwIDE.jar:native-bridge/target/ow-graphics-native-0.1.0-SNAPSHOT.jar:native-bridge/target/lib/*" dev.oreo.Main run examples/animation_crowd/main.ow
+```
+
+`MakeAnimationGraph(StateMachine)` implements `GRAPHICS_ANIMATION_GRAPH` with `initial`, `advance(library,state,rules,trigger,deltaSeconds)` and `sample`. The `rules` array accepts up to 128 ordered records `[fromClip,toClip,trigger,fadeSeconds]`; the first matching source/trigger wins, and `fromClip=-1` is a wildcard. The underlying Phase 11 machine defers new requests during an ongoing crossfade.
+
+`MakeActorCrowd(Graph)` implements `GRAPHICS_ANIMATION_CROWD`: `spawn(library,clip,xyz,rootNode)`, `advance`, `advance_all(library,actors,rules,triggers,deltaSeconds)`, `palette(library,actor)`, `model(actor)`. It stores state explicitly in `[state6,worldXYZ,rootNode,offsetXYZ]`; at most 32 actors share the same rig library. `advance_all` matches each actor with its own trigger string. There is no global JVM actor registry.
+
+For valid **translation-only** root motion, `advance` accumulates the root's local displacement into world XYZ only in stable playback and does not integrate movement during fades. `palette` subtracts the sample's local root offset from all joints so the simultaneous `model` world translation does **not** double-apply it. The `spawn` method verifies the selected root is an ancestor of every skin joint. This restricted approximation does not handle rotations, a moving skinned-mesh node, nonuniform parent scales or general retargeting. The actor world position persists while animation clips change; it is not a collision/physics controller.
+
+The renderer owns one OpenGL mesh and program. Each actor is drawn by binding its own `uModel` matrix and `uBones[32]` palette, then drawing the same mesh handle. This is **per-actor draw reuse**, not an instanced single draw. The GPU test `AnimationCrowdGpuSmoke` checks three independently colored actor pixels, then moves just the middle actor and confirms the others remain unchanged. The OW/flOW headless and GPU tests check the state graph, actor isolation and single-apply root motion.
+
+See [Animation Graphs and Crowds](ANIMATION-GRAPHS-AND-CROWD.md).

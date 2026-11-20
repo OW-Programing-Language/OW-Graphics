@@ -1,0 +1,10 @@
+# Actor = [machineState6, worldPositionXYZ, rootNodeID, paletteRootOffsetXYZ].
+# Each actor has independent transition times and root-motion accumulation.
+# A single GPU mesh may be shared; per-actor palettes and model matrices differ.
+module_type GRAPHICS_ANIMATION_CROWD:
+  include NATIVE_LIFECYCLE
+  fn spawn(library array, clip int, xyz array, rootNode int) -> array
+  fn advance(library array, actor array, rules array, trigger string, deltaSeconds float) -> array
+  fn advance_all(library array, actors array, rules array, triggers array, deltaSeconds float) -> array
+  fn palette(library array, actor array) -> array
+  fn model(actor array) -> array
