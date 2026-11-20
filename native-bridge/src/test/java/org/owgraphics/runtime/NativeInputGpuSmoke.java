@@ -41,6 +41,18 @@ public final class NativeInputGpuSmoke {
             double dy = ((Number) second.get(1)).doubleValue();
             check(Math.abs(dx - 32.0) < 2.1 && Math.abs(dy - 18.0) < 2.1,
                     "cursor polling must return real mouse changes: " + dx + "," + dy);
+            // Absolute cursor returns screen-independent OpenGL NDC,
+            // independent of any previous delta sampling.
+            GLFW.glfwSetCursorPos(window, 80.0, 60.0);
+            graphics.invoke("graphics.window.poll", List.of());
+            var ndc = (List<?>) graphics.invoke("graphics.input.cursor_ndc", List.of());
+            check(ndc.size() == 2, "cursor NDC contains x and y");
+            check(Math.abs(((Number) ndc.get(0)).doubleValue() + 0.5) < 0.05,
+                    "cursor x uses 320-wide logical window");
+            check(Math.abs(((Number) ndc.get(1)).doubleValue() - 0.5) < 0.05,
+                    "cursor y is inverted into OpenGL coordinates");
+            var ndcAgain = (List<?>) graphics.invoke("graphics.input.cursor_ndc", List.of());
+            check(ndc.equals(ndcAgain), "absolute polling must not consume cursor coordinates");
             double scroll = ((Number) graphics.invoke("graphics.input.scroll_delta", List.of())).doubleValue();
             check(scroll == 0.0, "initial scroll must be zero");
             check(((Number) graphics.invoke("graphics.input.scroll_delta", List.of())).doubleValue() == 0.0,

@@ -13,6 +13,7 @@ public final class GraphicsRuntimeExtensionTest {
         assertTrue(provider.supports("graphics.shader.uniform4"));
         assertTrue(provider.supports("graphics.mesh.draw"));
         assertTrue(provider.supports("graphics.window.request_close"));
+        assertTrue(provider.supports("graphics.input.cursor_ndc"));
         assertFalse(provider.supports("graphics.vulkan.draw"));
         assertFalse(provider.supports("night.security.enable"));
     }
