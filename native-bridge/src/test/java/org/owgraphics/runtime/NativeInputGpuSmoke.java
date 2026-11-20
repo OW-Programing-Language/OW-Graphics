@@ -14,6 +14,10 @@ public final class NativeInputGpuSmoke {
         try (var graphics = new GraphicsRuntimeExtension()) {
             check((int) graphics.invoke("graphics.window.open",
                     List.of(320, 240, "OW input smoke", "opengl")) == 1, "open");
+            check((int) graphics.invoke("graphics.input.key_down", List.of("ENTER")) == 0,
+                    "Enter key must be recognized by native GLFW bridge");
+            check((int) graphics.invoke("graphics.input.key_down", List.of("KP_ENTER")) == 0,
+                    "Numpad Enter key must be recognized by native GLFW bridge");
             check((int) graphics.invoke("graphics.input.key_down", List.of("LEFT")) == 0,
                     "no arrow key pressed");
             check((int) graphics.invoke("graphics.input.mouse_button_down", List.of("LEFT")) == 0,

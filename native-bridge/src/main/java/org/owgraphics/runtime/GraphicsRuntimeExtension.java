@@ -249,6 +249,8 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "UP" -> GLFW_KEY_UP;
             case "DOWN" -> GLFW_KEY_DOWN;
             case "SPACE" -> GLFW_KEY_SPACE;
+            case "ENTER" -> GLFW_KEY_ENTER;
+            case "KP_ENTER" -> GLFW_KEY_KP_ENTER;
             case "LEFT_SHIFT" -> GLFW_KEY_LEFT_SHIFT;
             default -> throw new IllegalArgumentException("Unsupported graphics key: " + name);
         };
