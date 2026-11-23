@@ -4,5 +4,8 @@ module_type GRAPHICS_INPUT:
   fn escape_pressed() -> int
   fn key_down(key string) -> int
   fn mouse_button_down(button string) -> int
+  # Absolute pointer position in OpenGL NDC (-1..1, Y increasing up).
+  # Coordinates outside the window are intentionally not clamped.
+  fn cursor_ndc() -> array
   fn cursor_delta() -> array
   fn scroll_delta() -> float
