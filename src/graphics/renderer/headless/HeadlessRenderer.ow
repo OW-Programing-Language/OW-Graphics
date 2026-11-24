@@ -35,6 +35,11 @@ module Graphics.HeadlessRenderer: GRAPHICS_RENDERER
       if: enabled != 1
         return: 0
     return: 1
+  fn blend(enabled int) -> int:
+    if: enabled != 0
+      if: enabled != 1
+        return: 0
+    return: 1
   fn draw_triangle() -> int:
     return: 1
   fn draw_mesh(mesh int) -> int:

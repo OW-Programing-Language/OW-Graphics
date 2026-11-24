@@ -4,5 +4,6 @@ module_type GRAPHICS_RENDERER:
   fn backend() -> string
   fn clear(red int, green int, blue int) -> int
   fn depth_test(enabled int) -> int
+  fn blend(enabled int) -> int
   fn draw_triangle() -> int
   fn draw_mesh(mesh int) -> int

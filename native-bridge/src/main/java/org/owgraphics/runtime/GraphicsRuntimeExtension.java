@@ -37,7 +37,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.window.open", "graphics.window.poll",
                  "graphics.window.present", "graphics.window.should_close",
                  "graphics.window.close", "graphics.window.request_close",
-                 "graphics.input.escape", "graphics.opengl.clear", "graphics.opengl.depth_test", "graphics.opengl.triangle",
+                 "graphics.input.escape", "graphics.opengl.clear", "graphics.opengl.depth_test", "graphics.opengl.blend", "graphics.opengl.triangle",
                  "graphics.shader.create", "graphics.shader.bind",
                  "graphics.shader.uniform4", "graphics.shader.uniform_mat4",
                  "graphics.shader.uniform_int", "graphics.shader.uniform_mat4_array",
@@ -45,7 +45,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
                  "graphics.mesh.create", "graphics.mesh.create_indexed", "graphics.mesh.create_lit_indexed",
                  "graphics.mesh.create_skinned_indexed",
                  "graphics.mesh.draw", "graphics.mesh.destroy",
-                 "graphics.texture.create_rgba8", "graphics.texture.load_image", "graphics.texture.bind",
+                 "graphics.texture.create_rgba8", "graphics.texture.load_image", "graphics.texture.load_image_smooth", "graphics.texture.bind",
                  "graphics.texture.destroy", "graphics.input.key_down",
                  "graphics.input.cursor_ndc", "graphics.input.cursor_delta", "graphics.input.scroll_delta",
                  "graphics.input.mouse_button_down",
@@ -103,6 +103,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.animation.timeline.events" -> animationEventsBetween(args);
             case "graphics.opengl.clear" -> clearFrame(args);
             case "graphics.opengl.depth_test" -> configureDepth(args);
+            case "graphics.opengl.blend" -> configureBlend(args);
             case "graphics.opengl.triangle" -> drawTriangle(args);
             case "graphics.shader.create" -> createShader(args);
             case "graphics.shader.bind" -> bindShader(args);
@@ -120,6 +121,7 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             case "graphics.mesh.destroy" -> destroyMesh(args);
             case "graphics.texture.create_rgba8" -> createTexture(args);
             case "graphics.texture.load_image" -> loadImage(args);
+            case "graphics.texture.load_image_smooth" -> loadImageSmooth(args);
             case "graphics.texture.bind" -> bindTexture(args);
             case "graphics.texture.destroy" -> destroyTexture(args);
             default -> throw new AssertionError("Unreachable graphics operation");
@@ -377,6 +379,23 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
             glClearDepth(1.0);
         } else {
             glDisable(GL_DEPTH_TEST);
+        }
+        return 1;
+    }
+
+    /** Opt-in straight-alpha blending for 2D overlays such as anti-aliased
+     *  text. Opaque 3D passes write alpha=1 and are unaffected while enabled. */
+    private int configureBlend(List<Object> args) {
+        count(args, 1);
+        int enabled = GraphicsArguments.integer(args.get(0), "blend enabled");
+        if (enabled != 0 && enabled != 1)
+            throw new IllegalArgumentException("blend accepts only 0 or 1");
+        ensureOwner();
+        if (enabled == 1) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        } else {
+            glDisable(GL_BLEND);
         }
         return 1;
     }
@@ -707,6 +726,14 @@ public final class GraphicsRuntimeExtension implements RuntimeExtension {
         var image = ImageAssetLoader.loadRelative(filename, Path.of("").toAbsolutePath());
         ensureOwner();
         return resources.createTexture(image);
+    }
+
+    private int loadImageSmooth(List<Object> args) {
+        count(args, 1);
+        String filename = GraphicsArguments.string(args.get(0), "image path");
+        var image = ImageAssetLoader.loadRelative(filename, Path.of("").toAbsolutePath());
+        ensureOwner();
+        return resources.createTexture(image, true);
     }
 
     private int bindTexture(List<Object> args) {
