@@ -4,5 +4,6 @@ module_type GRAPHICS_TEXTURE:
   include NATIVE_LIFECYCLE
   fn create_rgba8(width int, height int, pixels array) -> int
   fn load_image(relativePath string) -> int
+  fn load_image_smooth(relativePath string) -> int
   fn bind(handle int, slot int) -> int
   fn destroy(handle int) -> int

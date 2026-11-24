@@ -20,6 +20,8 @@ module Graphics.OpenGLRenderer: GRAPHICS_RENDERER
     return: extension("graphics.opengl.clear", red, green, blue)
   fn depth_test(enabled int) -> int:
     return: extension("graphics.opengl.depth_test", enabled)
+  fn blend(enabled int) -> int:
+    return: extension("graphics.opengl.blend", enabled)
   fn draw_triangle() -> int:
     return: extension("graphics.opengl.triangle")
   fn draw_mesh(mesh int) -> int:

@@ -18,6 +18,8 @@ module Graphics.OpenGLTexture: GRAPHICS_TEXTURE
     return: extension("graphics.texture.create_rgba8", width, height, pixels)
   fn load_image(relativePath string) -> int:
     return: extension("graphics.texture.load_image", relativePath)
+  fn load_image_smooth(relativePath string) -> int:
+    return: extension("graphics.texture.load_image_smooth", relativePath)
   fn bind(handle int, slot int) -> int:
     return: extension("graphics.texture.bind", handle, slot)
   fn destroy(handle int) -> int:

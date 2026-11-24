@@ -266,6 +266,13 @@ final class OpenGlResources {
     }
 
     int createTexture(GraphicsArguments.ImageData image) {
+        return createTexture(image, false);
+    }
+
+    /** When {@code smooth} is set the texture samples with bilinear filtering,
+     *  which lets a supersampled glyph atlas resolve to smooth anti-aliased
+     *  text instead of the blocky nearest-neighbour look pixel art wants. */
+    int createTexture(GraphicsArguments.ImageData image, boolean smooth) {
         int texture = glGenTextures();
         if (texture == 0)
             throw new IllegalStateException("OpenGL failed to allocate a texture");
@@ -277,8 +284,9 @@ final class OpenGlResources {
             pixelBuffer.put(image.rgba()).flip();
             glBindTexture(GL_TEXTURE_2D, texture);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            int filter = smooth ? GL_LINEAR : GL_NEAREST;
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.width(), image.height(),
